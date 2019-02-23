@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace FailToBan.Core
 {
     public static class RuleTypeExtension
     {
-        public static bool TryParse(this RuleType type, string name, out RuleType result)
+        public static bool TryParse(string name, out RuleType result)
         {
             if (mapping.ContainsKey(name))
             {

@@ -4,29 +4,25 @@ using System.Text;
 
 namespace FailToBan.Core
 {
-    public class Section
+    /// <inheritdoc />
+    public class Section : ISection
     {
-        private readonly Dictionary<RuleType, string> rules;
-        public string Name { get; }
+        private readonly Dictionary<RuleType, string> rules = new Dictionary<RuleType, string>();
 
-        public Section(string name)
-        {
-            this.Name = name;
-            rules = new Dictionary<RuleType, string>();
-        }
-
+        /// <inheritdoc />
         /// <summary>
         /// Устанавливает значение правилу, создавая его, если значение не было установлено
         /// </summary>
         /// <param name="rule">Правило, значение которого задаётся</param>
         /// <param name="value">Значение, устанавливаемое правилу</param>
         /// <returns>Текущая секция</returns>
-        public Section Set(RuleType rule, string value)
+        public ISection Set(RuleType rule, string value)
         {
             rules[rule] = value;
             return this;
         }
 
+        /// <inheritdoc />
         /// <summary>
         /// Возвращает значение правила
         /// </summary>
@@ -37,13 +33,19 @@ namespace FailToBan.Core
             return rules.ContainsKey(rule) ? rules[rule] : null;
         }
 
-        public override string ToString()
+        /// <inheritdoc />
+        /// <summary>
+        /// Возвращает текстовое представление секции для записи в конфигурационный файл
+        /// </summary>
+        /// <param name="name">Имя секции</param>
+        /// <returns></returns>
+        public string ToString(string name)
         {
             var builder = new StringBuilder();
-            builder.AppendLine($"[{this.Name}]");
+            builder.AppendLine($"[{name}]");
             foreach (var (rule, value) in rules)
             {
-                builder.AppendLine($"{rule} = {value}");
+                builder.AppendLine($"{RuleTypeExtension.ToString(rule)} = {value}");
             }
 
             return builder.ToString();

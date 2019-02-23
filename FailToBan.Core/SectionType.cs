@@ -2,11 +2,11 @@
 {
     public enum SectionType
     {
-        Name,
-        Definiton,
-        Default,
+        Main,
         Includes,
+        Default,
+        Definition,
         Init,
-        InitFamily
+        InitV6
     }
 }
