@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 
 namespace FailToBan.Core
@@ -19,6 +20,18 @@ namespace FailToBan.Core
         public ISection Set(RuleType rule, string value)
         {
             rules[rule] = value;
+            return this;
+        }
+
+        /// <summary>
+        /// Добавляет значение к правилу, создавая его, если значение не было установлено
+        /// </summary>
+        /// <param name="rule"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public ISection Add(RuleType rule, string value)
+        {
+            rules[rule] += $"{Environment.NewLine} {value}";
             return this;
         }
 

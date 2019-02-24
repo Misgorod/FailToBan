@@ -3,9 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28307.421
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FailToBan.Core", "FailToBan.Core\FailToBan.Core.csproj", "{C457F179-570F-4AC1-9DAA-F20722235D0A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FailToBan.Core", "FailToBan.Core\FailToBan.Core.csproj", "{C457F179-570F-4AC1-9DAA-F20722235D0A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FailToBan.Core.Tests", "FailToBan.Core.Tests\FailToBan.Core.Tests.csproj", "{DBFAF784-A8A7-4D13-96D5-9861EF16DF1E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FailToBan.Core.Tests", "FailToBan.Core.Tests\FailToBan.Core.Tests.csproj", "{DBFAF784-A8A7-4D13-96D5-9861EF16DF1E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FailToBan.Server", "FailToBan.Server\FailToBan.Server.csproj", "{3630D3F6-53C3-4E1C-B622-6906109E14B3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FailToBan.Client", "FailToBan.Client\FailToBan.Client.csproj", "{5D9127BE-796F-4EA9-AA40-1DFA4441488D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +25,14 @@ Global
 		{DBFAF784-A8A7-4D13-96D5-9861EF16DF1E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DBFAF784-A8A7-4D13-96D5-9861EF16DF1E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DBFAF784-A8A7-4D13-96D5-9861EF16DF1E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3630D3F6-53C3-4E1C-B622-6906109E14B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3630D3F6-53C3-4E1C-B622-6906109E14B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3630D3F6-53C3-4E1C-B622-6906109E14B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3630D3F6-53C3-4E1C-B622-6906109E14B3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D9127BE-796F-4EA9-AA40-1DFA4441488D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D9127BE-796F-4EA9-AA40-1DFA4441488D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D9127BE-796F-4EA9-AA40-1DFA4441488D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D9127BE-796F-4EA9-AA40-1DFA4441488D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

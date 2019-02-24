@@ -18,6 +18,19 @@ namespace FailToBan.Core.Tests
         }
 
         [Test]
+        public void Add_AddToExistingRule_RuleAdded()
+        {
+            // Arrange
+            var section = new Section();
+            // Act
+            section.Set(RuleType.Action, "value");
+            section.Add(RuleType.Action, "added");
+            var rule = section.Get(RuleType.Action);
+            // Assert
+            Assert.That(rule, Is.EqualTo("value\r\n added"));
+        }
+
+        [Test]
         public void Set_SetExistingRule_RuleSet()
         {
             // Arrange
