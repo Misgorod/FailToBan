@@ -9,29 +9,43 @@ namespace FailToBan.Server
     {
         private static async Task Main(string[] args)
         {
-            int i = 0;
-            while (true)
+            try
             {
-                var serverStream = new NamedPipeServerStream("VICFTB", PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte);
-                await serverStream.WaitForConnectionAsync();
-                var task = Task.Run(() => RunAsync(serverStream, i++));
+                using (var server = new ServerPipe("VICFTB"))
+                {
+                    while (true)
+                    {
+                        Console.WriteLine("Waiting for connection");
+                        int clientId = await server.WaitForConnectionAsync();
+                        Console.WriteLine($"Got connection with id {clientId}");
+                        var processTask = ProcessClientAsync(server, clientId).ContinueWith(task =>
+                        {
+                            Console.WriteLine($"Exception got for client with id: {clientId}");
+                            var exception = task.Exception;
+                            Console.WriteLine(exception?.Message);
+                        }, TaskContinuationOptions.OnlyOnFaulted);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
+            finally
+            {
+                Console.ReadLine();
             }
         }
 
-        private static async Task RunAsync(Stream serverStream, int clientId)
+        private static async Task ProcessClientAsync(ServerPipe server, int clientId)
         {
-            var message = "";
-            using (var reader = new StreamReader(serverStream))
-            while (message != "end" && !reader.EndOfStream)
+            while (server.IsConnected(clientId))
             {
-                message = await reader.ReadLineAsync();
-                await ProcessAsync(message, clientId);
+                string message = await server.ReadAsync(clientId);
+                Console.WriteLine($"Got message from client with id: {clientId}\n" +
+                                  $"Message: {message}");
+                await server.WriteAsync("Server message", clientId);
             }
-        }
-
-        private static async Task ProcessAsync(string message, int clientId)
-        {
-            await Console.Out.WriteLineAsync($"Message from {clientId}: {message}");
         }
     }
 }

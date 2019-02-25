@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.IO.Pipes;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace FailToBan.Client
@@ -11,23 +12,27 @@ namespace FailToBan.Client
         {
             try
             {
-                var clientStream = new NamedPipeClientStream(".", "VICFTB", PipeDirection.InOut);
-                await clientStream.ConnectAsync();
-                var message = "";
-                using (var writer = new StreamWriter(clientStream))
-                    while (message != "end")
+                using (var clientPipe = new ClientPipe("VICFTB"))
+                {
+                    await clientPipe.ConnectAsync();
+
+                    while (true)
                     {
-                        message = await Console.In.ReadLineAsync();
-                        await writer.WriteLineAsync(message);
-                        await writer.FlushAsync();
-                        await clientStream.FlushAsync();
+                        string request = await Console.In.ReadLineAsync();
+                        await clientPipe.WriteAsync(request);
+                        string response = await clientPipe.ReadAsync();
+                        await Console.Out.WriteLineAsync($"Server response: {response}");
                     }
+                }
             }
             catch (Exception e)
             {
                 Console.WriteLine(e);
             }
-            Console.ReadLine();
+            finally
+            {
+                Console.ReadLine();
+            }
         }
     }
 }

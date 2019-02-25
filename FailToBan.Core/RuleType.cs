@@ -224,6 +224,9 @@
         Norestored,
         Name,
         Failregex,
+        Daemon,
+        Datepattern,
+        Journalmatch,
         Null
     }
 }

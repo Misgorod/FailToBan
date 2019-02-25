@@ -8,7 +8,15 @@ namespace FailToBan.Core
     /// <inheritdoc />
     public class Section : ISection
     {
-        private readonly Dictionary<RuleType, string> rules = new Dictionary<RuleType, string>();
+        private readonly Dictionary<RuleType, string> rules;
+
+        private Section(Dictionary<RuleType, string> rules)
+        {
+            this.rules = rules;
+        }
+
+        public Section() : this(new Dictionary<RuleType, string>())
+        { }
 
         /// <inheritdoc />
         /// <summary>
@@ -44,6 +52,13 @@ namespace FailToBan.Core
         public string Get(RuleType rule)
         {
             return rules.ContainsKey(rule) ? rules[rule] : null;
+        }
+
+        public ISection Clone()
+        {
+            var cloneRules = new Dictionary<RuleType, string>(rules);
+            var clone = new Section(cloneRules);
+            return clone;
         }
 
         /// <inheritdoc />

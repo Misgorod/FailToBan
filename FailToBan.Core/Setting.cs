@@ -5,7 +5,15 @@ namespace FailToBan.Core
 {
     public class Setting : ISetting
     {
-        private readonly Dictionary<string, ISection> sections = new Dictionary<string, ISection>();
+        private readonly Dictionary<string, ISection> sections;
+
+        private Setting(Dictionary<string, ISection> sections)
+        {
+            this.sections = sections;
+        }
+
+        public Setting() : this(new Dictionary<string, ISection>())
+        { }
 
         /// <summary>
         /// Возвращает секцию из файла конфигурации по названию
@@ -26,6 +34,17 @@ namespace FailToBan.Core
         public bool AddSection(string name, ISection section)
         {
             return sections.TryAdd(name, section);
+        }
+
+        public ISetting Clone()
+        {
+            var cloneSections = new Dictionary<string, ISection>();
+            foreach (var (name, section) in sections)
+            {
+                cloneSections.Add(name, section.Clone());
+            }
+            var clone = new Setting(cloneSections);
+            return clone;
         }
 
         /// <summary>

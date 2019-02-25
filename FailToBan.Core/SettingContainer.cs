@@ -2,18 +2,26 @@
 
 namespace FailToBan.Core
 {
-    public class SettingContainer
+    public class SettingContainer : ISettingContainer
     {
-        private readonly Dictionary<(string, SettingType), ISetting> settings = new Dictionary<(string, SettingType), ISetting>();
+        private readonly Dictionary<(string name, SettingType type), ISetting> confSettings = new Dictionary<(string name, SettingType type), ISetting>();
+        private readonly Dictionary<(string name, SettingType type), ISetting> localSettings = new Dictionary<(string name, SettingType type), ISetting>();
 
-        public bool AddSetting(string name, SettingType type, ISetting setting)
+        public bool AddConf(string name, SettingType type, ISetting setting)
         {
-            return settings.TryAdd((name, type), setting);
+            return confSettings.TryAdd((name, type), setting);
         }
 
-        public ISetting GetSetting(string name, SettingType type)
+        public bool AddLocal(string name, SettingType type, ISetting setting)
         {
-            return settings.TryGetValue((name, type), out var setting) ? setting : null;
+            return localSettings.TryAdd((name, type), setting);
+        }
+
+        public (ISetting conf, ISetting local) GetSettings(string name, SettingType type)
+        {
+            var conf = confSettings.TryGetValue((name, type), out var confSetting) ? confSetting : null;
+            var local = localSettings.TryGetValue((name, type), out var localSetting) ? localSetting : null;
+            return (conf, local);
         }
     }
 }

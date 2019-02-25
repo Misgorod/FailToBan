@@ -12,12 +12,15 @@ namespace FailToBan.Core.Tests
         {
             // Arrange
             var settingContainer = new SettingContainer();
-            var mockSetting = new Mock<ISetting>(MockBehavior.Strict).Object;
-            settingContainer.AddSetting(service, type, mockSetting);
+            var mockConf = new Mock<ISetting>(MockBehavior.Strict).Object;
+            var mockLocal = new Mock<ISetting>(MockBehavior.Strict).Object;
+            settingContainer.AddConf(service, type, mockConf);
+            settingContainer.AddLocal(service, type, mockLocal);
             // Act
-            var result = settingContainer.GetSetting(service, type);
+            var result = settingContainer.GetSettings(service, type);
             // Assert
-            Assert.That(result, Is.SameAs(mockSetting));
+            Assert.That(result.conf, Is.SameAs(mockConf));
+            Assert.That(result.local, Is.SameAs(mockLocal));
         }
 
         [TestCase("sshd", SettingType.Jail)]
@@ -27,9 +30,10 @@ namespace FailToBan.Core.Tests
             // Arrange
             var settingContainer = new SettingContainer();
             // Act
-            var setting = settingContainer.GetSetting(service, type);
+            var setting = settingContainer.GetSettings(service, type);
             // Assert
-            Assert.That(setting, Is.Null);
+            Assert.That(setting.conf, Is.Null);
+            Assert.That(setting.local, Is.Null);
         }
 
         [TestCase("sshd", SettingType.Jail)]
@@ -38,12 +42,16 @@ namespace FailToBan.Core.Tests
         {
             // Arrange
             var settingContainer = new SettingContainer();
-            var mockSetting = new Mock<ISetting>(MockBehavior.Strict).Object;
-            settingContainer.AddSetting(service, type, mockSetting);
+            var mockConf = new Mock<ISetting>(MockBehavior.Strict).Object;
+            var mockLocal = new Mock<ISetting>(MockBehavior.Strict).Object;
+            settingContainer.AddConf(service, type, mockConf);
+            settingContainer.AddLocal(service, type, mockLocal);
             // Act
-            var result = settingContainer.AddSetting(service, type, mockSetting);
+            var confResult = settingContainer.AddConf(service, type, mockConf);
+            var localResult = settingContainer.AddLocal(service, type, mockLocal);
             // Assert
-            Assert.That(result, Is.False);
+            Assert.That(confResult, Is.False);
+            Assert.That(localResult, Is.False);
         }
     }
 }

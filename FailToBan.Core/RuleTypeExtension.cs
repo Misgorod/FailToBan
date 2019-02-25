@@ -83,6 +83,9 @@ namespace FailToBan.Core
             { "norestored", RuleType.Norestored },
             { "action_vic", RuleType.ActionVic },
             { "failregex", RuleType.Failregex },
+            { "_daemon", RuleType.Daemon },
+            { "datepattern", RuleType.Datepattern },
+            { "journalmatch", RuleType.Journalmatch }
         };
 
         //public static IReadOnlyDictionary<string, RuleInfo> Rules = new Dictionary<string, RuleInfo>

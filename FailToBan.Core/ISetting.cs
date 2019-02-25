@@ -7,5 +7,7 @@
         bool AddSection(string name, ISection section);
 
         string ToString();
+
+        ISetting Clone();
     }
 }
