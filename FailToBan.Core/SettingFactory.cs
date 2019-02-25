@@ -16,8 +16,14 @@ namespace FailToBan.Core
             this.continuationRegex = continuationRegex;
         }
 
+        public ISetting Build()
+        {
+            return new Setting();
+        }
+
         public ISetting Build(string configuration)
         {
+            if (configuration == null) return null;
             var setting = new Setting();
             // TODO: Create section factory
             Section section = null;
