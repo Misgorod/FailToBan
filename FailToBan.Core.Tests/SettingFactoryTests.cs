@@ -41,10 +41,21 @@ namespace FailToBan.Core.Tests
                 Assert.That(section, Is.Not.Null);
                 foreach (var ruleType in rules)
                 {
-                    var rule = section.Get(ruleType);
+                    var rule = section.GetRule(ruleType);
                     Assert.That(rule, Is.EqualTo(value));
                 }
             }
+        }
+
+        [Test]
+        public void Build_CreateSettingFromNull_ReturnsNull()
+        {
+            // Arrange
+            var sut = new SettingFactory(new Regex(""), new Regex(""), new Regex(""));
+            // Act
+            var setting = sut.Build(null);
+            // Assert
+            Assert.That(setting, Is.Null);
         }
     }
 }

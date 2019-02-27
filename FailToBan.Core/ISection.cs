@@ -2,13 +2,13 @@
 {
     public interface ISection
     {
-        ISection Set(RuleType rule, string value);
+        ISection SetRule(RuleType rule, string value);
 
-        ISection Add(RuleType rule, string value);
+        ISection AddToRule(RuleType rule, string value);
 
         ISection Clone();
 
-        string Get(RuleType rule);
+        string GetRule(RuleType rule);
 
         string ToString(string name);
     }

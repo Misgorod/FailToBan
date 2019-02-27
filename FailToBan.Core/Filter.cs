@@ -15,7 +15,7 @@ namespace FailToBan.Core
 
         //public override string GetRule(string section, RuleType type)
         //{
-        //    var value = nextService?.GetSection(section)?.Get(type) ?? base.GetRule(section, type) ?? prevService?.GetSection(section)?.Get(type);
+        //    var value = nextService?.GetSection(section)?.GetRule(type) ?? base.GetRule(section, type) ?? prevService?.GetSection(section)?.GetRule(type);
         //    return value;
         //}
 

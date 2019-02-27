@@ -16,11 +16,6 @@ namespace FailToBan.Core
             this.continuationRegex = continuationRegex;
         }
 
-        public ISetting Build()
-        {
-            return new Setting();
-        }
-
         public ISetting Build(string configuration)
         {
             if (configuration == null) return null;
@@ -43,14 +38,14 @@ namespace FailToBan.Core
                 if (ruleName != null && section != null && RuleTypeExtension.TryParse(ruleName, out rule))
                 {
                     ruleValue = ruleRegex.Match(s).Groups[2].Value;
-                    section.Set(rule, ruleValue);
+                    section.SetRule(rule, ruleValue);
                     continue;
                 }
 
                 var continuation = continuationRegex.IsMatch(s) ? continuationRegex.Match(s).Groups[1].Value : null;
                 if (continuation != null && ruleValue != null)
                 {
-                    section.Add(rule, continuation);
+                    section.AddToRule(rule, continuation);
                 }
             }
 

@@ -25,7 +25,7 @@ namespace FailToBan.Core
         /// <param name="rule">Правило, значение которого задаётся</param>
         /// <param name="value">Значение, устанавливаемое правилу</param>
         /// <returns>Текущая секция</returns>
-        public ISection Set(RuleType rule, string value)
+        public ISection SetRule(RuleType rule, string value)
         {
             rules[rule] = value;
             return this;
@@ -37,7 +37,7 @@ namespace FailToBan.Core
         /// <param name="rule"></param>
         /// <param name="value"></param>
         /// <returns></returns>
-        public ISection Add(RuleType rule, string value)
+        public ISection AddToRule(RuleType rule, string value)
         {
             rules[rule] += $"{Environment.NewLine} {value}";
             return this;
@@ -49,7 +49,7 @@ namespace FailToBan.Core
         /// </summary>
         /// <param name="rule">Правило</param>
         /// <returns>Значение правила</returns>
-        public string Get(RuleType rule)
+        public string GetRule(RuleType rule)
         {
             return rules.ContainsKey(rule) ? rules[rule] : null;
         }

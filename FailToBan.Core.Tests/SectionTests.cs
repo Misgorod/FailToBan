@@ -12,7 +12,7 @@ namespace FailToBan.Core.Tests
             // Arrange
             var section = new Section();
             // Act
-            var ruleValue = section.Get(RuleType.Null);
+            var ruleValue = section.GetRule(RuleType.Null);
             // Assert
             Assert.That(ruleValue, Is.Null);
         }
@@ -23,9 +23,9 @@ namespace FailToBan.Core.Tests
             // Arrange
             var section = new Section();
             // Act
-            section.Set(RuleType.Action, "value");
-            section.Add(RuleType.Action, "added");
-            var rule = section.Get(RuleType.Action);
+            section.SetRule(RuleType.Action, "value");
+            section.AddToRule(RuleType.Action, "added");
+            var rule = section.GetRule(RuleType.Action);
             // Assert
             Assert.That(rule, Is.EqualTo("value\r\n added"));
         }
@@ -36,8 +36,8 @@ namespace FailToBan.Core.Tests
             // Arrange
             var section = new Section();
             // Act
-            var newSection = section.Set(RuleType.Enabled, "true");
-            var ruleValue = section.Get(RuleType.Enabled);
+            var newSection = section.SetRule(RuleType.Enabled, "true");
+            var ruleValue = section.GetRule(RuleType.Enabled);
             // Assert
             Assert.That(section, Is.SameAs(newSection));
             Assert.That(ruleValue, Is.EqualTo("true"));
@@ -52,7 +52,7 @@ namespace FailToBan.Core.Tests
                                     "enabled = true\r" +
                                     "\n";
             // Act
-            section.Set(RuleType.Enabled, "true");
+            section.SetRule(RuleType.Enabled, "true");
             var result = section.ToString("TestSection");
             // Assert
             Assert.That(result, Is.EqualTo(expected));
