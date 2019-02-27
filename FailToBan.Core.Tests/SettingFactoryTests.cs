@@ -57,5 +57,16 @@ namespace FailToBan.Core.Tests
             // Assert
             Assert.That(setting, Is.Null);
         }
+
+        [Test]
+        public void Build_WithoutParameters_ReturnsNew()
+        {
+            // Arrange
+            var sut = new SettingFactory(new Regex(""), new Regex(""), new Regex(""));
+            // Act
+            var setting = sut.Build();
+            // Assert
+            Assert.That(setting, Is.InstanceOf<ISetting>());
+        }
     }
 }

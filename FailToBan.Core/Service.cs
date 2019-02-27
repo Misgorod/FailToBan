@@ -10,18 +10,18 @@
 
         public Service(ISetting confSetting, ISetting localSetting, string name)
         {
-            this.ConfSetting = confSetting;
-            this.LocalSetting = localSetting;
+            ConfSetting = confSetting;
+            LocalSetting = localSetting;
             Name = name;
         }
 
-        public Service(string name) : this(null, null, name)
+        public Service(ISetting localSetting, string name) : this(null, localSetting, name)
         { }
 
         public virtual string GetRule(string section, RuleType type)
         {
             var value = LocalSetting.GetSection(section)?.GetRule(type) ??
-                        ConfSetting.GetSection(section)?.GetRule(type);
+                        ConfSetting?.GetSection(section)?.GetRule(type);
             return value;
         }
 
@@ -29,6 +29,7 @@
         {
             var section = LocalSetting.GetSection(sectionName) ?? new Section();
             section.SetRule(type, value);
+            LocalSetting.AddSection(sectionName, section);
         }
 
         public virtual IService Clone()

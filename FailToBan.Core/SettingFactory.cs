@@ -51,5 +51,10 @@ namespace FailToBan.Core
 
             return setting;
         }
+
+        public ISetting Build()
+        {
+            return new Setting();
+        }
     }
 }

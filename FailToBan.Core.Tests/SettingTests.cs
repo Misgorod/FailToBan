@@ -50,5 +50,24 @@ namespace FailToBan.Core.Tests
             // Assert
             Assert.That(expected, Is.EqualTo(result));
         }
+
+        [TestCase("Test")]
+        public void Clone_CloneSetting_ReturnsCloned(string sectionName)
+        {
+            // Arrange
+            var sut = new Setting();
+            var mockSection = new Mock<ISection>(MockBehavior.Strict);
+            var clonedMockSection = new Mock<ISection>(MockBehavior.Strict).Object;
+            mockSection.Setup(x => x.Clone()).Returns(clonedMockSection);
+            var sutSection = mockSection.Object;
+            sut.AddSection(sectionName, sutSection);
+            // Act
+            var clone = sut.Clone();
+            var clonedSection = clone.GetSection(sectionName);
+            // Assert
+            Assert.That(clonedSection, Is.SameAs(clonedMockSection));
+            Assert.That(clone, Is.Not.SameAs(sut));
+            Assert.That(clonedSection, Is.Not.SameAs(sutSection));
+        }
     }
 }

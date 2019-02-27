@@ -127,10 +127,7 @@ namespace FailToBan.Core
                 }
                 else
                 {
-                    collection.Add(fileName, new Service(fileName)
-                    {
-                        ConfSetting = confSetting
-                    });
+                    collection.Add(fileName, new Service(confSetting, settingFactory.Build(), fileName));
                 }
             }
 
@@ -145,10 +142,7 @@ namespace FailToBan.Core
                 }
                 else
                 {
-                    collection.Add(fileName, new Service(fileName)
-                    {
-                        LocalSetting = localSetting
-                    });
+                    collection.Add(fileName, new Service(localSetting, fileName));
                 }
             }
 

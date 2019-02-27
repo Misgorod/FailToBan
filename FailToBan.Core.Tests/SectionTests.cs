@@ -57,5 +57,20 @@ namespace FailToBan.Core.Tests
             // Assert
             Assert.That(result, Is.EqualTo(expected));
         }
+
+        [TestCase(RuleType.Action, "value")]
+        public void Clone_CloneSection_ReturnsCloned(RuleType type, string value)
+        {
+            // Arrange
+            var sut = new Section();
+            sut.SetRule(type, value);
+            // Act
+            var clone = sut.Clone();
+            var clonedValue = clone.GetRule(type);
+            var sutValue = sut.GetRule(type);
+            // Assert
+            Assert.That(clone, Is.Not.SameAs(sut));
+            Assert.That(clonedValue, Is.EqualTo(sutValue));
+        }
     }
 }
