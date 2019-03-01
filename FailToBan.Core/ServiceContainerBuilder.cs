@@ -58,18 +58,19 @@ namespace FailToBan.Core
                 throw new VicException("Building jails before creating jail.conf");
             }
 
+            var builtJails = new Dictionary<string, IService>();
             var confFiles = fileSystem.Directory.GetFiles(path, "?*.conf");
             foreach (var confFile in confFiles)
             {
                 var fileName = fileSystem.Path.GetFileNameWithoutExtension(confFile);
                 var confSetting = BuildSettingFromPath(confFile);
-                if (jails.ContainsKey(fileName))
+                if (builtJails.ContainsKey(fileName))
                 {
-                    jails[fileName].ConfSetting = confSetting;
+                    builtJails[fileName].ConfSetting = confSetting;
                 }
                 else
                 {
-                    jails.Add(fileName, new Jail(fileName, defaultJail)
+                    builtJails.Add(fileName, new Jail(fileName, defaultJail)
                     {
                         ConfSetting = confSetting
                     });
@@ -81,18 +82,20 @@ namespace FailToBan.Core
             {
                 var fileName = fileSystem.Path.GetFileNameWithoutExtension(localFile);
                 var localSetting = BuildSettingFromPath(localFile);
-                if (jails.ContainsKey(fileName))
+                if (builtJails.ContainsKey(fileName))
                 {
-                    jails[fileName].LocalSetting = localSetting;
+                    builtJails[fileName].LocalSetting = localSetting;
                 }
                 else
                 {
-                    jails.Add(fileName, new Jail(fileName, defaultJail)
+                    builtJails.Add(fileName, new Jail(fileName, defaultJail)
                     {
                         LocalSetting = localSetting
                     });
                 }
             }
+
+            builtJails.ToList().ForEach(jail => jails[jail.Key] = jail.Value);
 
             return this;
         }

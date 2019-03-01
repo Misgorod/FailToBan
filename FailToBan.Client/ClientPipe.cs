@@ -28,13 +28,19 @@ namespace FailToBan.Client
         public async Task<string> ReadAsync()
         {
             var builder = new StringBuilder();
-            var message = "";
-            while (pipeClientStream.IsConnected && (message = await clientReader.ReadLineAsync()) != "end")
+            var message = await clientReader.ReadLineAsync();
+            while (pipeClientStream.IsConnected && message != "end" && message != "exit")
             {
                 builder.AppendLine(message);
+                message = await clientReader.ReadLineAsync();
             }
 
-            return builder.ToString();
+            if (message == "exit")
+            {
+                Dispose();
+            }
+            Console.WriteLine($"CLIENT PIPE GOT {builder.ToString().TrimEnd('\n')}");
+            return builder.ToString().TrimEnd('\n');
         }
 
         public async Task WriteAsync(string message)
@@ -45,6 +51,9 @@ namespace FailToBan.Client
                 await clientWriter.WriteLineAsync("end");
                 await clientWriter.FlushAsync();
             }
+
+            Console.WriteLine($"CLIENT PIPE SENT {message}");
+            Console.WriteLine($"CLIENT STOP SENT");
         }
 
         public void Dispose()

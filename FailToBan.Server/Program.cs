@@ -41,7 +41,7 @@ namespace FailToBan.Server
         {
             while (server.IsConnected(clientId))
             {
-                string message = await server.ReadAsync(clientId);
+                var message = await server.ReadAsync(clientId);
                 Console.WriteLine($"Got message from client with id: {clientId}\n" +
                                   $"Message: {message}");
                 await server.WriteAsync("Server message", clientId);

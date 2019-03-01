@@ -18,7 +18,6 @@ namespace FailToBan.Server
         {
             this.pipeName = pipeName;
             clients = new ConcurrentDictionary<int, (NamedPipeServerStream, StreamWriter, StreamReader)>();
-
         }
 
         public async Task<int> WaitForConnectionAsync()
@@ -41,24 +40,45 @@ namespace FailToBan.Server
             {
                 builder.AppendLine(message);
             }
-
-            return builder.ToString();
+            Console.WriteLine($"SERVER PIPE GOT {builder.ToString().TrimEnd('\n')}");
+            return builder.ToString().TrimEnd('\n');
         }
 
         public async Task WriteAsync(string message, int clientId)
         {
-            var (serverStream, streamWriter, _) = clients[clientId];
-            if (serverStream.IsConnected)
+            bool valueGot = clients.TryGetValue(clientId, out var result);
+            if (result.serverStream.IsConnected && valueGot)
             {
-                await streamWriter.WriteLineAsync(message);
-                await streamWriter.WriteLineAsync("end");
-                await streamWriter.FlushAsync();
+                await result.streamWriter.WriteLineAsync(message);
+                await result.streamWriter.WriteLineAsync("end");
+                await result.streamWriter.FlushAsync();
             }
+            Console.WriteLine($"SERVER PIPE SENT {message}");
+            Console.WriteLine($"SERVER STOP SENT");
+        }
+
+        public async Task WriteLastAsync(string message, int clientId)
+        {
+            bool valueGot = clients.TryGetValue(clientId, out var result);
+            if (result.serverStream.IsConnected && valueGot)
+            {
+                await result.streamWriter.WriteLineAsync(message);
+                await result.streamWriter.WriteLineAsync("exit");
+                await result.streamWriter.FlushAsync();
+            }
+            Console.WriteLine($"SERVER PIPE SENT {message}");
+            Console.WriteLine($"SERVER STOP SENT");
+            Disconnect(clientId);
         }
 
         public bool IsConnected(int clientId)
         {
-            return clients[clientId].serverStream.IsConnected;
+            return clients.ContainsKey(clientId) && clients[clientId].serverStream.IsConnected;
+        }
+
+        public bool Disconnect(int clientId)
+        {
+            return clients.TryRemove(clientId, out var streams);
         }
 
         public void Dispose()
@@ -67,7 +87,7 @@ namespace FailToBan.Server
             {
                 serverStream.Dispose();
             }
-            
+
         }
     }
 }
