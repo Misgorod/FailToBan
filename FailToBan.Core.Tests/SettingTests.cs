@@ -69,5 +69,21 @@ namespace FailToBan.Core.Tests
             Assert.That(clone, Is.Not.SameAs(sut));
             Assert.That(clonedSection, Is.Not.SameAs(sutSection));
         }
+
+        [TestCase("section")]
+        public void Sections_GetSection_GetCloned(string sectionName)
+        {
+            // Arrange
+            var sut = new Setting();
+            var mockSection = new Mock<ISection>();
+            mockSection
+                .Setup(x => x.Clone())
+                .Returns(new Mock<ISection>().Object);
+            sut.AddSection(sectionName, mockSection.Object);
+            // Act 
+            var sections = sut.Sections;
+            // Assert
+            Assert.That(mockSection.Object, Is.Not.SameAs(sections[sectionName]));
+        }
     }
 }

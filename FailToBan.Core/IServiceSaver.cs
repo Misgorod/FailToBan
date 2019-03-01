@@ -2,6 +2,7 @@
 {
     public interface IServiceSaver
     {
-        void Save(string path, IService service);
+        string Path { get; }
+        void Save(IService service);
     }
 }

@@ -7,16 +7,16 @@ namespace FailToBan.Core
     public class ServiceContainerBuilder : IServiceContainerBuilder
     {
         private readonly IFileSystem fileSystem;
-        private readonly ISettingFactory settingFactory;
+        private readonly IServiceFactory serviceFactory;
         private IService defaultJail;
         private readonly Dictionary<string, IService> jails;
         private readonly Dictionary<string, IService> actions;
         private readonly Dictionary<string, IService> filters;
 
-        public ServiceContainerBuilder(IFileSystem fileSystem, ISettingFactory settingFactory)
+        public ServiceContainerBuilder(IFileSystem fileSystem, IServiceFactory serviceFactory)
         {
             this.fileSystem = fileSystem;
-            this.settingFactory = settingFactory;
+            this.serviceFactory = serviceFactory;
             jails = new Dictionary<string, IService>();
             actions = new Dictionary<string, IService>();
             filters = new Dictionary<string, IService>();
@@ -31,15 +31,15 @@ namespace FailToBan.Core
         {
             var jailConfPath = fileSystem.Path.Combine(path, "jail.conf");
             var jailLocalPath = fileSystem.Path.Combine(path, "jail.local");
-            var jailConfSetting = BuildSettingFromPath(jailConfPath);
-            var jailLocalSetting = BuildSettingFromPath(jailLocalPath);
+            var jailConfText = ReadSettingFromPath(jailConfPath);
+            var jailLocalText = ReadSettingFromPath(jailLocalPath);
 
             // TODO: AddToRule service factory
-            defaultJail = new Service(jailConfSetting, jailLocalSetting, "jail");
+            defaultJail = serviceFactory.BuildService("jail", jailConfText, jailLocalText);
             return this;
         }
 
-        private ISetting BuildSettingFromPath(string path)
+        private string ReadSettingFromPath(string path)
         {
             if (!fileSystem.File.Exists(path))
             {
@@ -47,8 +47,7 @@ namespace FailToBan.Core
             }
 
             var settingText = fileSystem.File.ReadAllText(path);
-            var setting = settingFactory.Build(settingText);
-            return setting;
+            return settingText;
         }
 
         public IServiceContainerBuilder BuildJails(string path)
@@ -63,17 +62,17 @@ namespace FailToBan.Core
             foreach (var confFile in confFiles)
             {
                 var fileName = fileSystem.Path.GetFileNameWithoutExtension(confFile);
-                var confSetting = BuildSettingFromPath(confFile);
+                var confText = ReadSettingFromPath(confFile);
                 if (builtJails.ContainsKey(fileName))
                 {
-                    builtJails[fileName].ConfSetting = confSetting;
+                    var existingService = builtJails[fileName];
+                    var newService = serviceFactory.BuildJail(fileName, existingService.ConfSetting, existingService.LocalSetting, defaultJail);
+                    builtJails[fileName] = newService;
                 }
                 else
                 {
-                    builtJails.Add(fileName, new Jail(fileName, defaultJail)
-                    {
-                        ConfSetting = confSetting
-                    });
+                    builtJails.Add(fileName, serviceFactory.BuildJail(fileName, confText, null, defaultJail));
+
                 }
             }
 
@@ -81,17 +80,17 @@ namespace FailToBan.Core
             foreach (var localFile in localFiles)
             {
                 var fileName = fileSystem.Path.GetFileNameWithoutExtension(localFile);
-                var localSetting = BuildSettingFromPath(localFile);
+                var localText = ReadSettingFromPath(localFile);
                 if (builtJails.ContainsKey(fileName))
                 {
-                    builtJails[fileName].LocalSetting = localSetting;
+                    var existingService = builtJails[fileName];
+                    var newService = serviceFactory.BuildJail(fileName, existingService.ConfSetting, existingService.LocalSetting, defaultJail);
+                    builtJails[fileName] = newService;
                 }
                 else
                 {
-                    builtJails.Add(fileName, new Jail(fileName, defaultJail)
-                    {
-                        LocalSetting = localSetting
-                    });
+                    builtJails.Add(fileName, serviceFactory.BuildJail(fileName, null, localText, defaultJail));
+
                 }
             }
 
@@ -123,14 +122,16 @@ namespace FailToBan.Core
             foreach (var confFile in confFiles)
             {
                 var fileName = fileSystem.Path.GetFileNameWithoutExtension(confFile);
-                var confSetting = BuildSettingFromPath(confFile);
+                var confText = ReadSettingFromPath(confFile);
                 if (collection.ContainsKey(fileName))
                 {
-                    collection[fileName].ConfSetting = confSetting;
+                    var existingService = collection[fileName];
+                    var newService = serviceFactory.BuildService(fileName, existingService.ConfSetting, existingService.LocalSetting);
+                    collection[fileName] = newService;
                 }
                 else
                 {
-                    collection.Add(fileName, new Service(confSetting, settingFactory.Build(), fileName));
+                    collection.Add(fileName, serviceFactory.BuildService(fileName, confText, null));
                 }
             }
 
@@ -138,14 +139,16 @@ namespace FailToBan.Core
             foreach (var localFile in localFiles)
             {
                 var fileName = fileSystem.Path.GetFileNameWithoutExtension(localFile);
-                var localSetting = BuildSettingFromPath(localFile);
+                var localText = ReadSettingFromPath(localFile);
                 if (filters.ContainsKey(fileName))
                 {
-                    collection[fileName].LocalSetting = localSetting;
+                    var existingService = collection[fileName];
+                    var newService = serviceFactory.BuildService(fileName, existingService.ConfSetting, existingService.LocalSetting);
+                    collection[fileName] = newService;
                 }
                 else
                 {
-                    collection.Add(fileName, new Service(localSetting, fileName));
+                    collection.Add(fileName, serviceFactory.BuildService(fileName, null, localText));
                 }
             }
 

@@ -8,11 +8,11 @@ namespace FailToBan.Core
     /// <inheritdoc />
     public class Section : ISection
     {
-        private readonly Dictionary<RuleType, string> rules;
+        public Dictionary<RuleType, string> Rules { get; }
 
         private Section(Dictionary<RuleType, string> rules)
         {
-            this.rules = rules;
+            this.Rules = rules;
         }
 
         public Section() : this(new Dictionary<RuleType, string>())
@@ -27,7 +27,7 @@ namespace FailToBan.Core
         /// <returns>Текущая секция</returns>
         public ISection SetRule(RuleType rule, string value)
         {
-            rules[rule] = value;
+            Rules[rule] = value;
             return this;
         }
 
@@ -39,7 +39,7 @@ namespace FailToBan.Core
         /// <returns></returns>
         public ISection AddToRule(RuleType rule, string value)
         {
-            rules[rule] += $"{Environment.NewLine} {value}";
+            Rules[rule] += $"{Environment.NewLine} {value}";
             return this;
         }
 
@@ -51,12 +51,12 @@ namespace FailToBan.Core
         /// <returns>Значение правила</returns>
         public string GetRule(RuleType rule)
         {
-            return rules.ContainsKey(rule) ? rules[rule] : null;
+            return Rules.ContainsKey(rule) ? Rules[rule] : null;
         }
 
         public ISection Clone()
         {
-            var cloneRules = new Dictionary<RuleType, string>(rules);
+            var cloneRules = new Dictionary<RuleType, string>(Rules);
             var clone = new Section(cloneRules);
             return clone;
         }
@@ -71,7 +71,7 @@ namespace FailToBan.Core
         {
             var builder = new StringBuilder();
             builder.AppendLine($"[{name}]");
-            foreach (var (rule, value) in rules)
+            foreach (var (rule, value) in Rules)
             {
                 builder.AppendLine($"{RuleTypeExtension.ToString(rule)} = {value}");
             }

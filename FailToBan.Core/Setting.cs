@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace FailToBan.Core
@@ -7,6 +8,9 @@ namespace FailToBan.Core
     {
         private readonly Dictionary<string, ISection> sections;
 
+        public Dictionary<string, ISection> Sections => sections.Select(section=> new KeyValuePair<string, ISection>(section.Key, section.Value.Clone())).ToDictionary(pair => pair.Key, pair => pair.Value);
+
+        
         private Setting(Dictionary<string, ISection> sections)
         {
             this.sections = sections;
@@ -23,6 +27,11 @@ namespace FailToBan.Core
         public ISection GetSection(string name)
         {
             return sections.TryGetValue(name, out var section) ? section : null;
+        }
+
+        public ISection GetOrCreateSection(string name)
+        {
+            return sections.TryGetValue(name, out var section) ? section : new Section();
         }
 
         /// <summary>

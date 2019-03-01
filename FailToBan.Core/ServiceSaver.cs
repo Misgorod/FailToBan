@@ -6,25 +6,27 @@ namespace FailToBan.Core
     public class ServiceSaver : IServiceSaver
     {
         private readonly IFileSystem fileSystem;
+        public string Path { get; }
 
-        public ServiceSaver(IFileSystem fileSystem)
+        public ServiceSaver(string path, IFileSystem fileSystem)
         {
             this.fileSystem = fileSystem;
+            this.Path = path;
         }
 
-        public ServiceSaver() : this(new FileSystem())
+        public ServiceSaver(string path) : this(path, new FileSystem())
         { }
 
-        public void Save(string path, IService service)
+        public void Save(IService service)
         {
-            var confPath = fileSystem.Path.Combine(path, $"{service.Name}.conf");
+            var confPath = fileSystem.Path.Combine(Path, $"{service.Name}.conf");
             if (fileSystem.File.Exists(confPath))
             {
                 fileSystem.File.Move(confPath, $"{confPath}.bak");
             }
             fileSystem.File.WriteAllText(confPath, service.ConfSetting.ToString());
 
-            var localPath = fileSystem.Path.Combine(path, $"{service.Name}.local");
+            var localPath = fileSystem.Path.Combine(Path, $"{service.Name}.local");
             if (fileSystem.File.Exists(confPath))
             {
                 fileSystem.File.Move(localPath, $"{localPath}.bak");

@@ -1,273 +1,201 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using FailToBan.Core;
-using Microsoft.VisualBasic;
 
 namespace FailToBan.Server
 {
     public static class Commands
     {
-        public static Dictionary<string, bool> ManageJail(SettingContainer settingContainer)
+        public static Dictionary<string, bool> ManageJail(IServiceContainer serviceContainer)
         {
             var result = new Dictionary<string, bool>();
 
-            GetEnabled(settingContainer.JailConf.Sections);
-
-            foreach (var setting in settingContainer.JailConfSettings)
+            foreach (var (_, jail) in serviceContainer.Jails)
             {
-                GetEnabled(setting.Sections);
-            }
-
-            GetEnabled(settingContainer.JailLocal.Sections);
-
-            foreach (var setting in settingContainer.JailLocalSettings)
-            {
-                GetEnabled(setting.Sections);
+                var enabled = jail.GetRule(jail.Name, RuleType.Enabled) == "true";
+                result.Add(jail.Name, enabled);
             }
 
             return result;
-
-            // Nested method
-            void GetEnabled(List<Section> sections)
-            {
-                foreach (var section in sections)
-                {
-                    if (section.Name == "DEFAULT")
-                    {
-                        continue;
-                    }
-
-                    if (!result.ContainsKey(section.Name))
-                    {
-                        result.Add(section.Name, false);
-                    }
-
-                    if (section.HasRule(Rule.RuleType.enabled))
-                    {
-                        if (section.GetRuleValue(Rule.RuleType.enabled) == "true")
-                        {
-                            result[section.Name] = true;
-                        }
-                        else if (section.GetRuleValue(Rule.RuleType.enabled) == "false")
-                        {
-                            result[section.Name] = false;
-                        }
-                        else
-                        {
-                            throw new Exception("Неправильное значение правила enabled");
-                        }
-                    }
-                }
-            }
         }
 
-        public static Dictionary<string, string> ManageJail(SettingContainer settingContainer, string jailName)
+        public static Dictionary<string, string> ManageJail(IServiceContainer serviceContainer, string jailName)
         {
             var result = new Dictionary<string, string>();
 
-            GetRules(settingContainer.JailConf.Sections);
-
-            foreach (var setting in settingContainer.JailConfSettings)
+            var confSections = serviceContainer.GetJail(jailName).ConfSetting.Sections;
+            foreach (var (name, section) in confSections)
             {
-                GetRules(setting.Sections);
+                foreach (var (rule, value) in section.Rules)
+                {
+                    result[rule.ToString()] = value;
+                }
             }
 
-            GetRules(settingContainer.JailLocal.Sections);
-
-            foreach (var setting in settingContainer.JailLocalSettings)
+            var localSections = serviceContainer.GetJail(jailName).LocalSetting.Sections;
+            foreach (var (name, section) in localSections)
             {
-                GetRules(setting.Sections);
+                foreach (var (rule, value) in section.Rules)
+                {
+                    result[rule.ToString()] = value;
+                }
             }
 
             return result;
-
-            // Nested method
-            void GetRules(List<Section> sections)
-            {
-                foreach (var section in sections)
-                {
-                    if (section.Name == jailName || section.Name == "DEFAULT")
-                    {
-                        foreach (var rule in section.Rules)
-                        {
-                            if (Constants.Rules[rule.Key].Category != Constants.RuleCategory.Specific)
-                            {
-                                result[rule.Key] = rule.Value;
-                            }
-                        }
-                    }
-                }
-            }
         }
 
-        public static void ToggleJail(SettingContainer settingContainer, string jailName, bool value, bool save = true)
+        public static void ToggleJail(IServiceContainer serviceContainer, string jailName, bool value, IServiceSaver serviceSaver)
         {
-            settingContainer.SetJailValue(jailName, Rule.RuleType.enabled, value.ToString().ToLower());
+            var toggle = value ? "true" : "false";
+            var service = serviceContainer.GetJail(jailName);
+            service.SetRule(jailName, RuleType.Enabled, toggle);
 
-            if (save)
-            {
-                settingContainer.Save();
-            }
+            serviceSaver?.Save(service);
         }
 
-        public static void ToggleJails(SettingContainer settingContainer, IEnumerable<string> jails, bool value, bool save = true)
+        public static void ToggleJails(IServiceContainer serviceContainer, IEnumerable<string> jails, bool value, IServiceSaver serviceSaver)
         {
             foreach (var jail in jails)
             {
-                settingContainer.SetJailValue(jail, Rule.RuleType.enabled, value.ToString().ToLower());
-            }
-
-            if (save)
-            {
-                settingContainer.Save();
+                ToggleJail(serviceContainer, jail, value, serviceSaver);
             }
         }
 
-        public static void ChangeJailRule(SettingContainer settingContainer, string jailName, string ruleName, string ruleValue, bool save = true)
+        public static void ChangeJailRule(IServiceContainer serviceContainer, string jailName, string ruleName, string ruleValue, IServiceSaver serviceSaver)
         {
-            settingContainer.SetJailValue(jailName, ruleName, ruleValue);
-
-            if (save)
+            if (!RuleTypeExtension.TryParse(ruleName, out var rule))
             {
-                settingContainer.Save();
+                throw new VicException("Wrong rule name");
             }
+
+            var service = serviceContainer.GetJail(jailName);
+            service.SetRule(jailName, rule, ruleValue);
+            serviceSaver?.Save(service);
         }
 
-        public static void ChangeActionRule(SettingContainer settingContainer, string actionName, string sectionName, string ruleName, string ruleValue, bool save = true)
+        public static void ChangeActionRule(IServiceContainer serviceContainer, string jailName, string sectionName, string ruleName, string ruleValue, IServiceSaver serviceSaver)
         {
-            settingContainer.SetActionFilterValue(actionName, sectionName, ruleName, ruleValue, Setting.SettingType.action);
-
-            if (save)
+            if (!RuleTypeExtension.TryParse(ruleName, out var rule))
             {
-                settingContainer.Save();
+                throw new VicException("Wrong rule name");
             }
+
+            var service = serviceContainer.GetAction(jailName);
+            service.SetRule(sectionName, rule, ruleValue);
+            serviceSaver?.Save(service);
         }
 
-        public static void ChangeFilterRule(SettingContainer settingContainer, string filterName, string sectionName, string ruleName, string ruleValue, bool save = true)
+        public static void ChangeFilterRule(IServiceContainer serviceContainer, string jailName, string sectionName, string ruleName, string ruleValue, IServiceSaver serviceSaver)
         {
-            settingContainer.SetActionFilterValue(filterName, sectionName, ruleName, ruleValue, Setting.SettingType.filter);
-
-            if (save)
+            if (!RuleTypeExtension.TryParse(ruleName, out var rule))
             {
-                settingContainer.Save();
+                throw new VicException("Wrong rule name");
             }
+
+            var service = serviceContainer.GetFilter(jailName);
+            service.SetRule(sectionName, rule, ruleValue);
+            serviceSaver?.Save(service);
         }
 
-        public static void PrepareMail(SettingContainer settingContainer, string senderName, string SMTPUser, string mailTo, bool save = true)
+        public static void PrepareMail(IServiceContainer serviceContainer, IServiceFactory serviceFactory, string senderName, string smtpUser, string mailTo, IServiceSaver serviceSaver)
         {
-            //string actionBan = $"/_Data/Scripts/SendMail.sh --Title \"Subject: [Fail2Ban] <name>: banned <ip> from {senderName}\" --MailFrom \"" +
-            //$"{senderName} <<sender>>\" \"Hi,\\n" +
-            //"\n The IP <ip> has just been banned by Fail2Ban after" +
-            //"\n <failures> attempts against <name>.\\n" +
-            //"\n Regards,\\n" +
-            //"\n Fail2Ban\"";
+            var actionBan = "dotnet /_Data/CLI/VICFailToBan.dll _logban <ip> <name>";
+            var actionUnban = "dotnet /_Data/CLI/VICFailToBan.dll _logunban <ip> <name>";
 
-            string actionBan = "dotnet /_Data/CLI/VICFailToBan.dll _logban <ip> <name>";
-            string actionUnban = "dotnet /_Data/CLI/VICFailToBan.dll _logunban <ip> <name>";
 
-            Setting sendMailSetting = settingContainer.GetOrCreateSetting("sendmail-vic.local", Setting.SettingType.action);
+            var sendMailService = serviceContainer.GetAction("sendmail-vic") ?? 
+                                  serviceFactory.BuildService("sendmail-vic");
 
-            Section sendMailInclude = sendMailSetting.GetOrCreateSection("INCLUDES");
-            Section sendMailDefinition = sendMailSetting.GetOrCreateSection("Definition");
-            Section sendMailInit = sendMailSetting.GetOrCreateSection("Init");
+            var sendMailInclude = sendMailService.LocalSetting.GetOrCreateSection("INCLUDES");
+            var sendMailDefinition = sendMailService.LocalSetting.GetOrCreateSection("Definition");
+            var sendMailInit = sendMailService.LocalSetting.GetOrCreateSection("Init");
 
-            sendMailInclude.SetOrCreateRule(Rule.RuleType.before, "helpers-common.conf");
-            sendMailDefinition.SetOrCreateRule(Rule.RuleType.norestored, "1");
-            sendMailDefinition.SetOrCreateRule(Rule.RuleType.actionban, actionBan);
-            sendMailDefinition.SetOrCreateRule(Rule.RuleType.actionunban, actionUnban);
-            sendMailInit.SetOrCreateRule(Rule.RuleType.name, "default");
-            sendMailInit.SetOrCreateRule(Rule.RuleType.sender, SMTPUser);
+            sendMailInclude.SetRule(RuleType.Before, "helpers-common.conf");
+            sendMailDefinition.SetRule(RuleType.Norestored, "1");
+            sendMailDefinition.SetRule(RuleType.Actionban, actionBan);
+            sendMailDefinition.SetRule(RuleType.Actionunban, actionUnban);
+            sendMailInit.SetRule(RuleType.Name, "default");
+            sendMailInit.SetRule(RuleType.Sender, smtpUser);
 
-            Section jailConfDefault = settingContainer.JailConf.GetOrCreateSection("DEFAULT");
+            var defaultService = serviceContainer.GetDefault();
 
-            string action = "";
-            if (jailConfDefault.HasRule("action_"))
-            {
-                action = jailConfDefault.GetRuleValue("action_");
-            }
+            var action = defaultService.GetRule("DEFAULT", RuleType.Action_) ?? "";
 
-            string actionBanVIC = action +
+            var actionBanVic = action +
                 "\n\t\t\tsendmail-vic[name=%(__name__)s, logpath=%(logpath)s]";
 
-            Section jailLocalDefault = settingContainer.JailLocal.GetOrCreateSection("DEFAULT");
+            defaultService.SetRule("DEFAULT", RuleType.ActionVic, actionBanVic);
+            defaultService.SetRule("DEFAULT", RuleType.Action, "%(action_vic)s");
 
-            jailLocalDefault.SetOrCreateRule(Rule.RuleType.action_vic, actionBanVIC);
-            jailLocalDefault.SetOrCreateRule(Rule.RuleType.action, "%(action_vic)s");
-
-            if (save)
-            {
-                settingContainer.Save();
-            }
+            serviceSaver?.Save(sendMailService);
+            serviceSaver?.Save(defaultService);
         }
 
-        public static void PrepareBanAction(string path = Constants.JailConfPath)
+        public static void PrepareBanAction(IServiceContainer serviceContainer, IServiceSaver serviceSaver)
         {
-            string oldPath = Path.Combine(path, "action.d", "iptables-multiport.conf.base");
-            string newPath = Path.Combine(path, "action.d", "iptables-multiport.conf");
+            // Action: iptables-multiport
+            // Action: iptables-allports
+            var multiport = serviceContainer.GetAction("iptables-multiport") ?? throw new VicException("There is no iptables-multiport");
+            var allports = serviceContainer.GetAction("iptables-allports") ?? throw new VicException("There is no iptables-allports");
 
-            ReplaceChain("iptables-multiport");
-            File.Move(oldPath, newPath);
-
-            oldPath = Path.Combine(path, "action.d", "iptables-allports.conf.base");
-            newPath = Path.Combine(path, "action.d", "iptables-allports.conf");
-
-            ReplaceChain("iptables-allports");
-            File.Move(oldPath, newPath);
-
-            void ReplaceChain(string fileName)
+            var chainRegex = new Regex("[=]?(.)(<chain>)(.)");
+            var rulesToReplace = new List<RuleType>
             {
-                Setting setting = new Setting(oldPath, Setting.SettingType.action);
+                RuleType.Actionstart,
+                RuleType.Actionstop,
+                RuleType.Actionban,
+                RuleType.Actionunban
+            };
 
-                Regex chainRegex = new Regex("[=]?(.)(<chain>)(.)");
+            ReplaceAction(multiport, rulesToReplace, chainRegex);
+            ReplaceAction(allports, rulesToReplace, chainRegex);
 
-                List<Rule.RuleType> rulesToReplace = new List<Rule.RuleType>
+            serviceSaver?.Save(multiport);
+            serviceSaver?.Save(allports);
+        }
+
+        private static void ReplaceAction(IService service, List<RuleType> rulesToReplace, Regex chainRegex)
+        {
+            foreach (var rule in rulesToReplace)
+            {
+                var ruleValue = service.GetRule("Definition", rule);
+                if (ruleValue == null)
                 {
-                    Rule.RuleType.actionstart,
-                    Rule.RuleType.actionstop,
-                    Rule.RuleType.actionban,
-                    Rule.RuleType.actionunban
-                };
-
-                foreach (Rule.RuleType rule in rulesToReplace)
-                {
-                    if (!setting.HasRule(rule))
-                    {
-                        continue;
-                    }
-
-                    string actionOld = setting.GetRuleValue(rule);
-
-                    var actionList = new List<string>(actionOld.Split('\n'));
-
-                    string actionNew = "";
-                    foreach (string action in actionList)
-                    {
-                        if (chainRegex.IsMatch(action))
-                        {
-                            actionNew += chainRegex.Replace(action, (m) => m.Groups[1].Value + "INPUT" + m.Groups[3].Value) + "\n ";
-                            actionNew += chainRegex.Replace(action, (m) => m.Groups[1].Value + "FORWARD" + m.Groups[3].Value) + "\n ";
-                        }
-                        else
-                        {
-                            actionNew += action + '\n';
-                        }
-                    }
-
-                    setting.SetRule(rule, actionNew);
-
+                    continue;
                 }
 
-                setting.Save();
+                var actionList = new List<string>(ruleValue.Split('\n'));
 
+                var actionNew = "";
+                foreach (var action in actionList)
+                {
+                    if (chainRegex.IsMatch(action))
+                    {
+                        actionNew +=
+                            chainRegex.Replace(action, (m) => m.Groups[1].Value + "INPUT" + m.Groups[3].Value) +
+                            Environment.NewLine;
+                        actionNew +=
+                            chainRegex.Replace(action, (m) => m.Groups[1].Value + "FORWARD" + m.Groups[3].Value) +
+                            Environment.NewLine;
+                    }
+                    else
+                    {
+                        actionNew += action + Environment.NewLine;
+                    }
+                }
+
+                service.SetRule("Definition", rule, actionNew);
             }
         }
 
-        public static bool LogBan(IPAddress ip, string service, string mailLogFile = Constants.MailLogPath, string statusLogFile = Constants.StatusLogPath)
+        public static bool LogBan(IPAddress ip, string service, string mailLogFile, string statusLogFile)
         {
             Console.WriteLine("START WRITE TO MAIL LOG");
             using (var writer = new StreamWriter(File.Open(mailLogFile, FileMode.Append, FileAccess.Write)))
@@ -284,7 +212,7 @@ namespace FailToBan.Server
             return true;
         }
 
-        public static bool LogUnban(IPAddress ip, string service, string mailLogFile = Constants.MailLogPath, string statusLogFile = Constants.StatusLogPath)
+        public static bool LogUnban(IPAddress ip, string service, string mailLogFile, string statusLogFile, string blackListFile)
         {
             Console.WriteLine("START LOG UNBAN");
             Console.WriteLine("START WRITE TO MAIL LOG");
@@ -299,7 +227,7 @@ namespace FailToBan.Server
                 writer.WriteLine($"unban;{DateTime.Now.ToString(Constants.TimeFormat)};{ip.ToString()};{service}");
             }
 
-            var blackList = BlackListStatus();
+            var blackList = BlackListStatus(blackListFile);
             Console.WriteLine("GOT BLACK LIST");
             if (blackList.Contains((ip, service)))
             {
@@ -313,7 +241,7 @@ namespace FailToBan.Server
             return true;
         }
 
-        public static List<(IPAddress, string)> BlackListStatus(string blackListFile = Constants.BlackListPath)
+        public static List<(IPAddress, string)> BlackListStatus(string blackListFile)
         {
             var result = new List<(IPAddress, string)>();
             using (var reader = new StreamReader(File.Open(blackListFile, FileMode.OpenOrCreate, FileAccess.Read)))
@@ -352,6 +280,53 @@ namespace FailToBan.Server
             }
 
             return result;
+        }
+
+        private static Dictionary<IPAddress, List<BanInfo>> ParseIps(string file)
+        {
+            var bans = new Dictionary<IPAddress, List<BanInfo>>();
+
+            if (!File.Exists(file))
+            {
+                return bans;
+            }
+
+            using (var reader = new StreamReader(File.Open(file, FileMode.Open, FileAccess.Read)))
+            {
+                string line = "";
+                while ((line = reader.ReadLine()) != null)
+                {
+                    string[] args = line.Split(';');
+
+                    BanInfo.BanType type;
+                    var ip = IPAddress.Parse(args[2]);
+                    var time = DateTime.ParseExact(args[1], Constants.TimeFormat, new CultureInfo("ru-RU"));
+                    string service = args[3];
+
+                    if (args[0] == "ban")
+                    {
+                        type = BanInfo.BanType.Ban;
+                    }
+                    else if (args[0] == "unban")
+                    {
+                        type = BanInfo.BanType.Unban;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Неверный тип действия в файле ip");
+                        continue;
+                    }
+
+                    if (!bans.ContainsKey(ip))
+                    {
+                        bans[ip] = new List<BanInfo>();
+                    }
+
+                    bans[ip].Add(new BanInfo(type, time, service));
+                }
+            }
+
+            return bans;
         }
 
         public static bool Ban(IPAddress ip, string service)
