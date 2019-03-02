@@ -39,5 +39,10 @@
         {
             return new Jail(confSetting, localSetting, name, defaultService);
         }
+
+        public IService BuildJail(string name, IService defaultService)
+        {
+            return new Jail(name, defaultService);
+        }
     }
 }

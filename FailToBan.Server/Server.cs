@@ -5,21 +5,22 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using FailToBan.Core;
 
 namespace FailToBan.Server
 {
     public class Server
     {
-        private static SettingContainer settingContainer;
-        private static Logger logger;
+        private static IServiceContainer serviceContainer;
+        //private static Logger logger;
         private static Dictionary<int, Shell> sessions;
 
         private static Client client = null;
 
         private static async Task Main(string[] args)
         {
-            logger = new Logger();
-            LogData("Логгер запущен", Logger.From.Unknown, Logger.LogType.Debug);
+            //logger = new Logger();
+            //LogData("Логгер запущен", Logger.From.Unknown, Logger.LogType.Debug);
 
             if (!Directory.Exists("/_Data/Confs/Jails"))
             {

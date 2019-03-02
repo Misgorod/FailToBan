@@ -27,11 +27,26 @@ namespace FailToBan.Core
             fileSystem.File.WriteAllText(confPath, service.ConfSetting.ToString());
 
             var localPath = fileSystem.Path.Combine(Path, $"{service.Name}.local");
-            if (fileSystem.File.Exists(confPath))
+            if (fileSystem.File.Exists(localPath))
             {
                 fileSystem.File.Move(localPath, $"{localPath}.bak");
             }
             fileSystem.File.WriteAllText(localPath, service.LocalSetting.ToString());
+        }
+
+        public void Delete(IService service)
+        {
+            var confPath = fileSystem.Path.Combine(Path, $"{service.Name}.conf");
+            if (fileSystem.File.Exists(confPath))
+            {
+                fileSystem.File.Delete(confPath);
+            }
+
+            var localPath = fileSystem.Path.Combine(Path, $"{service.Name}.local");
+            if (fileSystem.File.Exists(localPath))
+            {
+                fileSystem.File.Delete(localPath);
+            }
         }
     }
 }

@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 
 namespace FailToBan.Core
 {
@@ -8,23 +10,22 @@ namespace FailToBan.Core
     {
         private readonly IFileSystem fileSystem;
         private readonly IServiceFactory serviceFactory;
-        private IService defaultJail;
-        private readonly Dictionary<string, IService> jails;
-        private readonly Dictionary<string, IService> actions;
-        private readonly Dictionary<string, IService> filters;
+        private readonly ISettingFactory settingFactory;
+        private IServiceContainer serviceContainer;
 
-        public ServiceContainerBuilder(IFileSystem fileSystem, IServiceFactory serviceFactory)
+        public ServiceContainerBuilder(IFileSystem fileSystem, IServiceFactory serviceFactory, ISettingFactory settingFactory)
         {
             this.fileSystem = fileSystem;
             this.serviceFactory = serviceFactory;
-            jails = new Dictionary<string, IService>();
-            actions = new Dictionary<string, IService>();
-            filters = new Dictionary<string, IService>();
+            this.settingFactory = settingFactory;
+            this.serviceContainer = new ServiceContainer();
         }
 
         public IServiceContainer Build()
         {
-            return new ServiceContainer(defaultJail, jails, actions, filters);
+            var result = serviceContainer;
+            serviceContainer = new ServiceContainer();
+            return result;
         }
 
         public IServiceContainerBuilder BuildDefault(string path)
@@ -35,7 +36,8 @@ namespace FailToBan.Core
             var jailLocalText = ReadSettingFromPath(jailLocalPath);
 
             // TODO: AddToRule service factory
-            defaultJail = serviceFactory.BuildService("jail", jailConfText, jailLocalText);
+            var defaultJail = serviceFactory.BuildService("jail", jailConfText, jailLocalText);
+            serviceContainer.SetDefault(defaultJail);
             return this;
         }
 
@@ -52,107 +54,140 @@ namespace FailToBan.Core
 
         public IServiceContainerBuilder BuildJails(string path)
         {
+            var defaultJail = serviceContainer.GetDefault();
             if (defaultJail == null)
             {
                 throw new VicException("Building jails before creating jail.conf");
             }
 
-            var builtJails = new Dictionary<string, IService>();
-            var confFiles = fileSystem.Directory.GetFiles(path, "?*.conf");
-            foreach (var confFile in confFiles)
+            var files = fileSystem.Directory.GetFiles(path);
+            foreach (var file in files)
             {
-                var fileName = fileSystem.Path.GetFileNameWithoutExtension(confFile);
-                var confText = ReadSettingFromPath(confFile);
-                if (builtJails.ContainsKey(fileName))
+                var fileName = fileSystem.Path.GetFileNameWithoutExtension(file);
+                var fileNameWithExt = fileSystem.Path.GetFileName(file);
+                if (Regex.IsMatch(fileNameWithExt, @"[\w\d\-_]+.conf$"))
                 {
-                    var existingService = builtJails[fileName];
-                    var newService = serviceFactory.BuildJail(fileName, existingService.ConfSetting, existingService.LocalSetting, defaultJail);
-                    builtJails[fileName] = newService;
+                    var confText = ReadSettingFromPath(file);
+                    var confSetting = settingFactory.Build(confText);
+                    var jail = serviceContainer.GetJail(fileName);
+                    if (jail != null)
+                    {
+                        jail.ConfSetting = confSetting;
+                    }
+                    else
+                    {
+                        jail = serviceFactory.BuildJail(fileName, defaultJail);
+                        jail.ConfSetting = confSetting;
+                        serviceContainer.SetJail(jail);
+                    }
                 }
-                else
+                else if (Regex.IsMatch(fileNameWithExt, @"[\w\d\-_]+.local$"))
                 {
-                    builtJails.Add(fileName, serviceFactory.BuildJail(fileName, confText, null, defaultJail));
-
+                    var localText = ReadSettingFromPath(file);
+                    var localSetting = settingFactory.Build(localText);
+                    var jail = serviceContainer.GetJail(fileName);
+                    if (jail != null)
+                    {
+                        jail.LocalSetting = localSetting;
+                    }
+                    else
+                    {
+                        jail = serviceFactory.BuildJail(fileName, defaultJail);
+                        jail.LocalSetting = localSetting;
+                        serviceContainer.SetJail(jail);
+                    }
                 }
             }
-
-            var localFiles = fileSystem.Directory.GetFiles(path, "?*.local");
-            foreach (var localFile in localFiles)
-            {
-                var fileName = fileSystem.Path.GetFileNameWithoutExtension(localFile);
-                var localText = ReadSettingFromPath(localFile);
-                if (builtJails.ContainsKey(fileName))
-                {
-                    var existingService = builtJails[fileName];
-                    var newService = serviceFactory.BuildJail(fileName, existingService.ConfSetting, existingService.LocalSetting, defaultJail);
-                    builtJails[fileName] = newService;
-                }
-                else
-                {
-                    builtJails.Add(fileName, serviceFactory.BuildJail(fileName, null, localText, defaultJail));
-
-                }
-            }
-
-            builtJails.ToList().ForEach(jail => jails[jail.Key] = jail.Value);
 
             return this;
         }
 
         public IServiceContainerBuilder BuildActions(string path)
         {
-            var builtActions = BuildCollection(path);
-            builtActions.ToList().ForEach(action => actions[action.Key] = action.Value);
+            var files = fileSystem.Directory.GetFiles(path);
+            foreach (var file in files)
+            {
+                var fileName = fileSystem.Path.GetFileNameWithoutExtension(file);
+                var fileNameWithExt = fileSystem.Path.GetFileName(file);
+                if (Regex.IsMatch(fileNameWithExt, @"[\w\d\-_]+.conf$"))
+                {
+                    var confText = ReadSettingFromPath(file);
+                    var confSetting = settingFactory.Build(confText);
+                    var action = serviceContainer.GetAction(fileName);
+                    if (action != null)
+                    {
+                        action.ConfSetting = confSetting;
+                    }
+                    else
+                    {
+                        action = serviceFactory.BuildService(fileName);
+                        action.ConfSetting = confSetting;
+                        serviceContainer.SetAction(action);
+                    }
+                }
+                else if (Regex.IsMatch(fileNameWithExt, @"[\w\d\-_]+.local$"))
+                {
+                    var localText = ReadSettingFromPath(file);
+                    var localSetting = settingFactory.Build(localText);
+                    var action = serviceContainer.GetAction(fileName);
+                    if (action != null)
+                    {
+                        action.LocalSetting = localSetting;
+                    }
+                    else
+                    {
+                        action = serviceFactory.BuildService(fileName);
+                        action.LocalSetting = localSetting;
+                        serviceContainer.SetAction(action);
+                    }
+                }
+            }
 
             return this;
         }
 
         public IServiceContainerBuilder BuildFilters(string path)
         {
-            var builtFilters = BuildCollection(path);
-            builtFilters.ToList().ForEach(filter => filters[filter.Key] = filter.Value);
+            var files = fileSystem.Directory.GetFiles(path);
+            foreach (var file in files)
+            {
+                var fileName = fileSystem.Path.GetFileNameWithoutExtension(file);
+                var fileNameWithExt = fileSystem.Path.GetFileName(file);
+                if (Regex.IsMatch(fileNameWithExt, @"[\w\d\-_]+.conf$"))
+                {
+                    var confText = ReadSettingFromPath(file);
+                    var confSetting = settingFactory.Build(confText);
+                    var filter = serviceContainer.GetFilter(fileName);
+                    if (filter != null)
+                    {
+                        filter.ConfSetting = confSetting;
+                    }
+                    else
+                    {
+                        filter = serviceFactory.BuildService(fileName);
+                        filter.ConfSetting = confSetting;
+                        serviceContainer.SetFilter(filter);
+                    }
+                }
+                else if (Regex.IsMatch(fileNameWithExt, @"[\w\d\-_]+.local$"))
+                {
+                    var localText = ReadSettingFromPath(file);
+                    var localSetting = settingFactory.Build(localText);
+                    var action = serviceContainer.GetFilter(fileName);
+                    if (action != null)
+                    {
+                        action.LocalSetting = localSetting;
+                    }
+                    else
+                    {
+                        action = serviceFactory.BuildService(fileName);
+                        action.LocalSetting = localSetting;
+                        serviceContainer.SetFilter(action);
+                    }
+                }
+            }
 
             return this;
-        }
-
-        private Dictionary<string, IService> BuildCollection(string path)
-        {
-            var collection = new Dictionary<string, IService>();
-            var confFiles = fileSystem.Directory.GetFiles(path, "?*.conf");
-            foreach (var confFile in confFiles)
-            {
-                var fileName = fileSystem.Path.GetFileNameWithoutExtension(confFile);
-                var confText = ReadSettingFromPath(confFile);
-                if (collection.ContainsKey(fileName))
-                {
-                    var existingService = collection[fileName];
-                    var newService = serviceFactory.BuildService(fileName, existingService.ConfSetting, existingService.LocalSetting);
-                    collection[fileName] = newService;
-                }
-                else
-                {
-                    collection.Add(fileName, serviceFactory.BuildService(fileName, confText, null));
-                }
-            }
-
-            var localFiles = fileSystem.Directory.GetFiles(path, "?*.local");
-            foreach (var localFile in localFiles)
-            {
-                var fileName = fileSystem.Path.GetFileNameWithoutExtension(localFile);
-                var localText = ReadSettingFromPath(localFile);
-                if (filters.ContainsKey(fileName))
-                {
-                    var existingService = collection[fileName];
-                    var newService = serviceFactory.BuildService(fileName, existingService.ConfSetting, existingService.LocalSetting);
-                    collection[fileName] = newService;
-                }
-                else
-                {
-                    collection.Add(fileName, serviceFactory.BuildService(fileName, null, localText));
-                }
-            }
-
-            return collection;
         }
     }
 }

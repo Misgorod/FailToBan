@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -179,10 +178,10 @@ namespace FailToBan.Server
                     if (chainRegex.IsMatch(action))
                     {
                         actionNew +=
-                            chainRegex.Replace(action, (m) => m.Groups[1].Value + "INPUT" + m.Groups[3].Value) +
+                            chainRegex.Replace(action, m => m.Groups[1].Value + "INPUT" + m.Groups[3].Value) +
                             Environment.NewLine;
                         actionNew +=
-                            chainRegex.Replace(action, (m) => m.Groups[1].Value + "FORWARD" + m.Groups[3].Value) +
+                            chainRegex.Replace(action, m => m.Groups[1].Value + "FORWARD" + m.Groups[3].Value) +
                             Environment.NewLine;
                     }
                     else
@@ -200,13 +199,13 @@ namespace FailToBan.Server
             Console.WriteLine("START WRITE TO MAIL LOG");
             using (var writer = new StreamWriter(File.Open(mailLogFile, FileMode.Append, FileAccess.Write)))
             {
-                writer.WriteLine($"ban;{DateTime.Now.ToString(Constants.TimeFormat)};{ip.ToString()};{service}");
+                writer.WriteLine($"ban;{DateTime.Now.ToString(Constants.TimeFormat)};{ip};{service}");
             }
 
             Console.WriteLine("START WRITE TO STATUS LOG");
             using (var writer = new StreamWriter(File.Open(statusLogFile, FileMode.Append, FileAccess.Write)))
             {
-                writer.WriteLine($"ban;{DateTime.Now.ToString(Constants.TimeFormat)};{ip.ToString()};{service}");
+                writer.WriteLine($"ban;{DateTime.Now.ToString(Constants.TimeFormat)};{ip};{service}");
             }
 
             return true;
@@ -218,13 +217,13 @@ namespace FailToBan.Server
             Console.WriteLine("START WRITE TO MAIL LOG");
             using (var writer = new StreamWriter(File.Open(mailLogFile, FileMode.Append, FileAccess.Write)))
             {
-                writer.WriteLine($"unban;{DateTime.Now.ToString(Constants.TimeFormat)};{ip.ToString()};{service}");
+                writer.WriteLine($"unban;{DateTime.Now.ToString(Constants.TimeFormat)};{ip};{service}");
             }
 
             Console.WriteLine("START WRITE TO STATUS LOG");
             using (var writer = new StreamWriter(File.Open(statusLogFile, FileMode.Append, FileAccess.Write)))
             {
-                writer.WriteLine($"unban;{DateTime.Now.ToString(Constants.TimeFormat)};{ip.ToString()};{service}");
+                writer.WriteLine($"unban;{DateTime.Now.ToString(Constants.TimeFormat)};{ip};{service}");
             }
 
             var blackList = BlackListStatus(blackListFile);
@@ -232,7 +231,7 @@ namespace FailToBan.Server
             if (blackList.Contains((ip, service)))
             {
                 Console.WriteLine("START BAN BY FAIL2BAN");
-                string result = $"fail2ban-client set {service} banip '{ip.ToString()}'".Bash();
+                string result = $"fail2ban-client set {service} banip '{ip}'".Bash();
                 Console.WriteLine("FINISH BAN BY FAIL2BAN");
                 Console.WriteLine("FINISH LOG UNBAN");
                 return CheckBanResult(result);
@@ -261,21 +260,21 @@ namespace FailToBan.Server
             return result;
         }
 
-        public static List<(IPAddress, string)> BannedListStatus(string statusLogFile = Constants.StatusLogPath)
+        public static IEnumerable<(IPAddress, string)> BannedListStatus(string statusLogFile = Constants.StatusLogPath)
         {
             var result = new List<(IPAddress, string)>();
-            var bans = Extension.ParseIps(statusLogFile);
+            var bans = ParseIps(statusLogFile);
 
-            foreach (var ban in bans)
+            foreach (var (ipAddress, info) in bans)
             {
-                string service = ban.Value.Where(x =>
-                {
-                    return (x.BanTime == ban.Value.Max(y => y.BanTime));
-                }).FirstOrDefault(x => x.Type == BanInfo.BanType.Ban)?.Service;
+                var service = info
+                    .Where(x => x.BanTime == info.Max(y => y.BanTime))
+                    .FirstOrDefault(x => x.Type == BanInfo.BanType.Ban)?
+                    .Service;
 
                 if (service != null)
                 {
-                    result.Add((ban.Key, service));
+                    result.Add((ipAddress, service));
                 }
             }
 
@@ -293,15 +292,15 @@ namespace FailToBan.Server
 
             using (var reader = new StreamReader(File.Open(file, FileMode.Open, FileAccess.Read)))
             {
-                string line = "";
+                var line = "";
                 while ((line = reader.ReadLine()) != null)
                 {
-                    string[] args = line.Split(';');
+                    var args = line.Split(';');
 
                     BanInfo.BanType type;
                     var ip = IPAddress.Parse(args[2]);
                     var time = DateTime.ParseExact(args[1], Constants.TimeFormat, new CultureInfo("ru-RU"));
-                    string service = args[3];
+                    var service = args[3];
 
                     if (args[0] == "ban")
                     {
@@ -329,14 +328,14 @@ namespace FailToBan.Server
             return bans;
         }
 
-        public static bool Ban(IPAddress ip, string service)
+        public static bool Ban(IPAddress ip, string service, string blackListFile)
         {
             Console.WriteLine("START BAN");
-            if (!BlackListStatus().Contains((ip, service)))
+            if (!BlackListStatus(blackListFile).Contains((ip, service)))
             {
                 AddToBlackList(ip, service);
             }
-            string result = $"fail2ban-client set {service} banip '{ip.ToString()}'".Bash();
+            string result = $"fail2ban-client set {service} banip '{ip}'".Bash();
             Console.WriteLine("FINISH BAN");
             return (CheckBanResult(result));
         }
@@ -345,21 +344,20 @@ namespace FailToBan.Server
         {
             using (var writer = new StreamWriter(File.Open(blackListFile, FileMode.Append, FileAccess.Write)))
             {
-                writer.WriteLine($"{ip.ToString()};{service}");
+                writer.WriteLine($"{ip};{service}");
             }
         }
 
-        public static bool Unban(IPAddress ip, string service)
+        public static bool Unban(IPAddress ip, string service, string blackListFile)
         {
-            DeleteFromBlackList(ip);
+            DeleteFromBlackList(ip, blackListFile);
             Console.WriteLine("START UNBAN");
-            string result = $"fail2ban-client set {service} unbanip '{ip.ToString()}'".Bash();
-            //LogUnban(ip, service);
+            var result = $"fail2ban-client set {service} unbanip '{ip}'".Bash();
             Console.WriteLine("FINISH UNBAN");
             return (CheckBanResult(result));
         }
 
-        private static void DeleteFromBlackList(IPAddress ip, string blackListFile = Constants.BlackListPath)
+        private static void DeleteFromBlackList(IPAddress ip, string blackListFile)
         {
             if (!File.Exists(blackListFile))
             {
@@ -369,10 +367,10 @@ namespace FailToBan.Server
             using (var reader = new StreamReader(File.Open(blackListFile, FileMode.Open, FileAccess.Read)))
             using (var writer = new StreamWriter(File.Open(blackListFile + ".bak", FileMode.Create, FileAccess.Write)))
             {
-                string line = "";
+                var line = "";
                 while ((line = reader.ReadLine()) != null)
                 {
-                    if (!Regex.IsMatch(line, $@".*{ip.ToString()}.*"))
+                    if (!Regex.IsMatch(line, $@".*{ip}.*"))
                     {
                         writer.WriteLine(line);
                     }
@@ -392,35 +390,35 @@ namespace FailToBan.Server
 
         public static void Reban(string blackListFile = Constants.BlackListPath)
         {
-            $"fail2ban-client unban --all".Bash();
+            "fail2ban-client unban --all".Bash();
 
             using (var reader = new StreamReader(File.Open(blackListFile, FileMode.OpenOrCreate, FileAccess.Read)))
             {
-                string line = "";
+                var line = "";
                 while ((line = reader.ReadLine()) != null)
                 {
-                    string[] values = line.Split(";");
-                    if (IPAddress.TryParse(values[0], out IPAddress ip))
+                    var values = line.Split(";");
+                    if (IPAddress.TryParse(values[0], out var ip))
                     {
-                        $"fail2ban-client set {values[1]} banip {ip.ToString()}".Bash();
+                        $"fail2ban-client set {values[1]} banip {ip}".Bash();
                     }
                 }
             }
         }
 
-        public static bool SendMail(string mailLogFile = Constants.MailLogPath)
+        public static bool SendMail(string mailLogFile)
         {
-            var bans = Extension.ParseIps(mailLogFile);
+            var bans = ParseIps(mailLogFile);
 
             if (bans == null || bans.Count == 0)
             {
                 return false;
             }
 
-            string message = CreateMessage(bans);
-            string senderName = Environment.GetEnvironmentVariable("SenderName");
-            string SMTPUser = Environment.GetEnvironmentVariable("SMTPUser");
-            string result = $"/_Data/Scripts/SendMail.sh --AsHtml --Title \"[Fail2Ban] Список забаненных адресов от {senderName} за {DateTime.Now.ToString(Constants.TimeFormat)}\" --MailFrom \"{senderName} <{SMTPUser}>\" \"{message}\"".Bash();
+            var message = CreateMessage(bans);
+            var senderName = Environment.GetEnvironmentVariable("SenderName");
+            var SMTPUser = Environment.GetEnvironmentVariable("SMTPUser");
+            var result = $"/_Data/Scripts/SendMail.sh --AsHtml --Title \"[Fail2Ban] Список забаненных адресов от {senderName} за {DateTime.Now.ToString(Constants.TimeFormat)}\" --MailFrom \"{senderName} <{SMTPUser}>\" \"{message}\"".Bash();
 
             return CheckMailResult(result, mailLogFile);
         }
@@ -432,61 +430,57 @@ namespace FailToBan.Server
                 File.WriteAllText(mailLogFile, string.Empty);
                 return true;
             }
-            else
-            {
-                return false;
-            }
+
+            return false;
         }
 
         private static string CreateMessage(Dictionary<IPAddress, List<BanInfo>> bans)
         {
-            StringBuilder builder = new StringBuilder();
-            string now = DateTime.Now.ToString(Constants.TimeFormat);
+            var builder = new StringBuilder();
+            var now = DateTime.Now.ToString(Constants.TimeFormat);
             var banInfo = CreateBanInfo(bans);
 
-            builder.Append($"<html><body>");
+            builder.Append("<html><body>");
             builder.Append($"<h2>Статистика произведённых действий за {now}:</h2>");
 
-            builder.Append($"<div>Список забаненных адресов:</div>");
+            builder.Append("<div>Список забаненных адресов:</div>");
             foreach (var ban in banInfo)
             {
                 var (ip, type, time, count, services) = ban;
 
-                if (type == BanInfo.BanType.Ban)
+                if (type != BanInfo.BanType.Ban) continue;
+
+                builder.Append($"<div style='margin-left: 40px'><b>{ip}</b> был забанен {count} раз(а). ");
+
+                var strings = new List<string>();
+                foreach (var (service, banCount) in services)
                 {
-                    builder.Append($"<div style='margin-left: 40px'><b>{ip}</b> был забанен {count} раз(а). ");
-
-                    List<string> strings = new List<string>();
-                    foreach (var service in services)
-                    {
-                        strings.Add($"{service.Item1} : {service.Item2}");
-                    }
-
-                    builder.Append($"Время первого бана: {time}. " +
-                        $"Забанен в следующих сервисах: [{string.Join(", ", strings)}]. ");
-                    builder.Append("</div>");
+                    strings.Add($"{service} : {banCount}");
                 }
+
+                builder.Append($"Время первого бана: {time}. " +
+                               $"Забанен в следующих сервисах: [{string.Join(", ", strings)}]. ");
+                builder.Append("</div>");
             }
 
-            builder.Append($"<div>Список разбаненных адресов:</div>");
+            builder.Append("<div>Список разбаненных адресов:</div>");
             foreach (var ban in banInfo)
             {
                 var (ip, type, time, count, services) = ban;
 
-                if (type == BanInfo.BanType.Unban)
+                if (type != BanInfo.BanType.Unban) continue;
+
+                builder.Append($"<div style='margin-left: 40px'><b>{ip}</b> был разбанен {count} раз(а). ");
+
+                var strings = new List<string>();
+                foreach (var (service, unbanCount) in services)
                 {
-                    builder.Append($"<div style='margin-left: 40px'><b>{ip}</b> был разбанен {count} раз(а). ");
-
-                    List<string> strings = new List<string>();
-                    foreach (var service in services)
-                    {
-                        strings.Add($"{service.Item1} : {service.Item2}");
-                    }
-
-                    builder.Append($"Время последнего разбана: {time}. " +
-                        $"Разбанен в следующих сервисах: [{string.Join(", ", strings)}]. ");
-                    builder.Append("</div>");
+                    strings.Add($"{service} : {unbanCount}");
                 }
+
+                builder.Append($"Время последнего разбана: {time}. " +
+                               $"Разбанен в следующих сервисах: [{string.Join(", ", strings)}]. ");
+                builder.Append("</div>");
             }
 
             builder.Append("</body></html>");
@@ -503,23 +497,32 @@ namespace FailToBan.Server
                 var banList = ban.Value.Where(x => x.Type == BanInfo.BanType.Ban);
                 var unbanList = ban.Value.Where(x => x.Type == BanInfo.BanType.Unban);
 
-                IPAddress ip = ban.Key;
-                BanInfo.BanType lastActionType = ban.Value.First(x => x.BanTime == ban.Value.Max(z => z.BanTime)).Type;
-                DateTime time = new DateTime();
-                int count = 0;
-                List<(string, int)> services = new List<(string, int)>();
+                var ip = ban.Key;
+                var lastActionType = ban
+                    .Value
+                    .First(x => x.BanTime == ban.Value.Max(z => z.BanTime))
+                    .Type;
+                int count;
+                List<(string, int)> services;
+                DateTime time;
 
                 if (lastActionType == BanInfo.BanType.Ban)
                 {
-                    time = banList.First(x => x.BanTime == banList.Max(z => z.BanTime)).BanTime; // last ban time
+                    time = banList.Max(x => x.BanTime);
                     count = banList.Count();
-                    services = banList.GroupBy(x => x.Service).Select(x => (x.Key, banList.Count(y => y.Service == x.Key))).ToList();
+                    services = banList
+                        .GroupBy(x => x.Service)
+                        .Select(x => (x.Key, banList.Count(y => y.Service == x.Key)))
+                        .ToList();
                 }
                 else
                 {
-                    time = unbanList.First(x => x.BanTime == unbanList.Min(z => z.BanTime)).BanTime; // first unban time
+                    time = unbanList.Min(x => x.BanTime);
                     count = unbanList.Count();
-                    services = unbanList.GroupBy(x => x.Service).Select(x => (x.Key, unbanList.Count(y => y.Service == x.Key))).ToList();
+                    services = unbanList
+                        .GroupBy(x => x.Service)
+                        .Select(x => (x.Key, unbanList.Count(y => y.Service == x.Key)))
+                        .ToList();
                 }
 
                 banInfo.Add((ip, lastActionType, time.ToString(Constants.TimeFormat), count, services));
@@ -532,7 +535,7 @@ namespace FailToBan.Server
         {
             using (var reader = new StreamReader(File.Open(filtersPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite)))
             {
-                string file = "";
+                var file = "";
                 while (file != null)
                 {
                     file = reader.ReadLine();

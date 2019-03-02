@@ -1,4 +1,6 @@
-﻿namespace FailToBan.Core
+﻿using System.Collections.Generic;
+
+namespace FailToBan.Core
 {
     // TODO: AddToRule check of after and before properties
     public class Service : IService

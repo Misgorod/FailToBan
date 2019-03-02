@@ -4,5 +4,6 @@
     {
         string Path { get; }
         void Save(IService service);
+        void Delete(IService service);
     }
 }

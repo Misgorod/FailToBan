@@ -7,7 +7,7 @@ namespace FailToBan.Core
 {
     public class ServiceContainer : IServiceContainer
     {
-        private readonly IService jail;
+        private IService jail;
         private readonly Dictionary<string, IService> jails;
         private readonly Dictionary<string, IService> actions;
         private readonly Dictionary<string, IService> filters;
@@ -24,9 +24,22 @@ namespace FailToBan.Core
             this.filters = filters;
         }
 
+        public ServiceContainer()
+        {
+            this.jail = null;
+            this.jails = new Dictionary<string, IService>();
+            this.actions = new Dictionary<string, IService>();
+            this.filters = new Dictionary<string, IService>();
+        }
+
         public IService GetDefault()
         {
             return jail;
+        }
+
+        public void SetDefault(IService jail)
+        {
+            this.jail = jail;
         }
 
         public IService GetJail(string name)
@@ -34,14 +47,45 @@ namespace FailToBan.Core
             return jails.GetValueOrDefault(name, null);
         }
 
+        public void SetJail(IService jail)
+        {
+            jails[jail.Name] = jail;
+        }
+
+        public bool DeleteJail(string name)
+        {
+            return jails.Remove(name);
+        }
+
         public IService GetFilter(string name)
         {
             return filters.GetValueOrDefault(name, null);
+        }
+
+        public void SetFilter(IService filter)
+        {
+            filters[filter.Name] = filter;
+        }
+
+        public bool DeleteFilter(string name)
+        {
+            return filters.Remove(name);
         }
 
         public IService GetAction(string name)
         {
             return actions.GetValueOrDefault(name, null);
         }
+
+        public void SetAction(IService action)
+        {
+            actions[action.Name] = action;
+        }
+
+        public bool DeleteAction(string name)
+        {
+            return actions.Remove(name);
+        }
+
     }
 }
