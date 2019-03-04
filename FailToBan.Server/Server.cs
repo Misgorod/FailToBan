@@ -6,21 +6,27 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using FailToBan.Core;
+using FailToBan.Server.Shells;
 
 namespace FailToBan.Server
 {
     public class Server
     {
         private static IServiceContainer serviceContainer;
-        //private static Logger logger;
-        private static Dictionary<int, Shell> sessions;
+        private static IServiceSaver defaultSaver;
+        private static IServiceSaver jailSaver;
+        private static IServiceSaver actionSaver;
+        private static IServiceSaver filterSaver;
 
-        private static Client client = null;
+        private static ISettingFactory settingFactory;
+        private static IServiceFactory serviceFactory;
+        private static Logger logger;
+        private static Dictionary<int, Shell> sessions;
 
         private static async Task Main(string[] args)
         {
-            //logger = new Logger();
-            //LogData("Логгер запущен", Logger.From.Unknown, Logger.LogType.Debug);
+            logger = new Logger();
+            LogData("Логгер запущен", Logger.From.Unknown, Logger.LogType.Debug);
 
             if (!Directory.Exists("/_Data/Confs/Jails"))
             {
@@ -30,20 +36,9 @@ namespace FailToBan.Server
 
             try
             {
-                LogData("Выбор режима работы программы", Logger.From.Unknown, Logger.LogType.Debug);
-                if (args.Length > 0 && args[0] == "server")
-                {
-                    LogData("Работа в режиме сервера", Logger.From.Server, Logger.LogType.Debug);
-                    await Start();
-                }
-                else
-                {
-                    LogData("Работа в режиме клиента", Logger.From.Client, Logger.LogType.Debug);
-                    client = new Client();
-                    await client.Start(args);
-                }
+                await Start();
             }
-            catch (VICException e)
+            catch (VicException e)
             {
                 LogData("Message: " + e.Message, Logger.From.Unknown, Logger.LogType.Error);
                 LogData("Type: " + e.GetType().ToString(), Logger.From.Unknown, Logger.LogType.Error);
@@ -66,7 +61,18 @@ namespace FailToBan.Server
                 {
                     try
                     {
-                        settingContainer = new SettingContainer();
+                        settingFactory = new SettingFactory(Constants.SectionRegex, Constants.KeyValueRegex, Constants.ContinueRegex);
+                        serviceFactory = new ServiceFactory(settingFactory);
+                        IServiceContainerBuilder serviceContainerBuilder = new ServiceContainerBuilder(serviceFactory, settingFactory);
+                        serviceContainer = serviceContainerBuilder
+                            .BuildDefault("/etc/fail2ban")
+                            .BuildJails("/etc/fail2ban/jail.d")
+                            .BuildJails("/_Data/Confs/Jails")
+                            .BuildActions("/etc/fail2ban/action.d")
+                            .BuildFilters("/etc/fail2ban/filter.d")
+                            .BuildFilters("/_Data/Confs/Filters")
+                            .Build();
+
                         LogData("Контейнер инициализирован", Logger.From.Server, Logger.LogType.Debug);
                         Prepare();
                     }
@@ -135,7 +141,7 @@ namespace FailToBan.Server
         {
             LogData("Подготовка почты и действий для бана", Logger.From.Server, Logger.LogType.Debug);
 
-            Commands.PrepareBanAction(settingContainer.MainPath);
+            Commands.PrepareBanAction(serviceContainer, actionSaver);
 
             var senderName = Environment.GetEnvironmentVariable("SenderName");
             var smtpUser = Environment.GetEnvironmentVariable("SMTPUser");
@@ -147,7 +153,7 @@ namespace FailToBan.Server
                 throw new Exception("Перед запуском нужно указать переменные окружения SMTPUser, MailTo SenderName и mailRepeatTime");
             }
 
-            Commands.PrepareMail(settingContainer, senderName, smtpUser, mailTo);
+            Commands.PrepareMail(serviceContainer, serviceFactory,  senderName, smtpUser, mailTo, defaultSaver, actionSaver);
             Commands.PrepareFilters(Constants.FiltersListPath);
             Commands.PrepareWhiteList(settingContainer);
         }

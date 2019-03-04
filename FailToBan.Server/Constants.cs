@@ -6,15 +6,10 @@ namespace FailToBan.Server
 {
     public class Constants
     {
-        //#if DEBUG
-        //public const string JailConfPath = "D:/docker_test/fail2ban";
-        //public const string JailsPath = "/docker_test/fail2ban";
-        //#else
         public const string JailConfPath = "/etc/fail2ban/";
         public const string JailsPath = "/_Data/Confs/Jails";
         public const string ActionsPath = "/_Data/Confs/Actions";
         public const string FiltersPath = "/_Data/Confs/Filters";
-        //#endif
         public const string WhiteListPath = "/_Data/Util/WhiteList";
         public const string FiltersListPath = "/_Data/Util/FilterList";
         public const string StatusLogPath = "/_Data/Util/StatusLog";
@@ -22,9 +17,6 @@ namespace FailToBan.Server
         public const string ResultPath = "/_Data/Util/Result";
         public const string BlackListPath = "/_Data/Util/BlackList";
         public const string TimeFormat = "dd'/'MM'/'yyyy' 'HH':'mm':'ss";
-        //public readonly static string WhiteListPath = Path.Combine(JailConfPath, "WhiteList");
-        //public readonly static string JailDPath = Path.Combine(JailConfPath, "jail.d");
-        //public readonly static string ActionDPath = Path.Combine(JailConfPath, "action.d");
 
         public readonly static Regex SectionRegex = new Regex(@"^\[(.+)\]\s*$", RegexOptions.Singleline);
         public readonly static Regex KeyValueRegex = new Regex(@"^([^#\s]\S*)\s*=\s*(.+)", RegexOptions.Singleline);
@@ -127,44 +119,20 @@ namespace FailToBan.Server
             { "failregex", new RuleInfo() { Type = Rule.RuleType.failregex, Category = RuleCategory.Specific, Description = "Регулярное выражение, по которому выбираются неудачные попытки"} }
         };
 
-        public enum ConnectionCommands { OK, Part, Error, End, Back, Forward }
-        public static IReadOnlyDictionary<ConnectionCommands, string> ConnectionCommand = new Dictionary<ConnectionCommands, string>
+        public enum ShellSteps { Prepare, CreateRuleName, EditRuleName, Ports, LogPath, Filter, TestFilter, SetRule, Exit }
+        public static IReadOnlyDictionary<ShellSteps, string> ShellTexts = new Dictionary<ShellSteps, string>()
         {
-            { ConnectionCommands.OK, "OK" },
-            { ConnectionCommands.Part, "Part" },
-            { ConnectionCommands.Error, "Error" },
-            { ConnectionCommands.End, "End" },
-            { ConnectionCommands.Back, "Back" },
-            { ConnectionCommands.Forward, "Forward" },
-        };
-
-        public enum ClientMode { Normal, Create, Edit }
-
-        public enum CreateSteps { Prepare, RuleName, Ports, Path, Filter, TestFilter, Other, Exit }
-        public static IReadOnlyDictionary<CreateSteps, string> CreateTexts = new Dictionary<CreateSteps, string>
-        {
-            { CreateSteps.Prepare, "Запуск CLI для создания нового сервиса" },
-            { CreateSteps.RuleName, "Введите имя сервиса для которого вы хотите создать правило (для просмотра преднастроенных правил введите --List)" },
-            { CreateSteps.Ports, "Введите список портов в формате \"xxxx, xxxx, xxxx\"" },
-            { CreateSteps.Path, "Введите путь до каталога с файлом лога авторизации" },
-            { CreateSteps.Filter, "Введите регулярное выражение для поиска строки с сообщением о неуспешной авторизации\nПримечание: формат обычный regexp, для указания хоста на его месте введите <HOST>" },
-            { CreateSteps.TestFilter, "Хотите ли вы протестировать работу регулярного выражения(y/n)? Примечание: для тестирование в файле лога должна быть запись о неудачной авторизации" },
-            { CreateSteps.Other, "Введите save для сохранения\n" +
+            { ShellSteps.Prepare, "Запуск CLI для создания нового сервиса" },
+            { ShellSteps.CreateRuleName, "Введите имя сервиса для которого вы хотите создать правило (для просмотра преднастроенных правил введите --List)" },
+            { ShellSteps.EditRuleName, "Введите имя сервиса, значения правил которого вы хотите изменить (для просмотра настроенных правил введите --List)" },
+            { ShellSteps.Ports, "Введите список портов в формате \"xxxx, xxxx, xxxx\"" },
+            { ShellSteps.LogPath, "Введите путь до каталога с файлом лога авторизации" },
+            { ShellSteps.Filter, "Введите регулярное выражение для поиска строки с сообщением о неуспешной авторизации\nПримечание: формат обычный regexp, для указания хоста на его месте введите <HOST>" },
+            { ShellSteps.TestFilter, "Хотите ли вы протестировать работу регулярного выражения(y/n)? Примечание: для тестирование в файле лога должна быть запись о неудачной авторизации" },
+            { ShellSteps.SetRule, "Введите save для сохранения\n" +
                                  "Введите дополнительные значения для правила в формате 'rule value'\n" +
                                  "Введите название правила и ? в формате 'rule ?' для получения значения по умолчанию для этого правила" },
-            { CreateSteps.Exit, "Выход из интерактивного режима" }
-        };
-
-        public enum EditSteps { Prepare, RuleName, Ports, Path, Filter, TestFilter, Set, Exit }
-        public static IReadOnlyDictionary<EditSteps, string> EditTexts = new Dictionary<EditSteps, string>
-        {
-            { EditSteps.Prepare, "Запуск CLI для изменения существующего сервиса" },
-            { EditSteps.RuleName, "Введите имя сервиса, значения правил которого вы хотите изменить (для просмотра настроенных правил введите --List)" },
-            { EditSteps.Ports, "Введите список портов в формате \"xxxx, xxxx, xxxx\"" },
-            { EditSteps.Path, "Введите путь до каталога с файлом лога авторизации" },
-            { EditSteps.Filter, "Введите регулярное выражение для поиска строки с сообщением о неуспешной авторизации\nПримечание: формат обычный regexp, для указания хоста на его месте введите <HOST>" },
-            { EditSteps.Set, "Введите правило и значение которые хотите изменить в формате \"rule value\"\nДля сохранения введите save" },
-            { EditSteps.Exit, "Выход из интерактивного режима" }
+            { ShellSteps.Exit, "Выход из интерактивного режима" }
         };
     }
 }

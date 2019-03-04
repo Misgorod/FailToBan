@@ -103,7 +103,7 @@ namespace FailToBan.Server
             serviceSaver?.Save(service);
         }
 
-        public static void PrepareMail(IServiceContainer serviceContainer, IServiceFactory serviceFactory, string senderName, string smtpUser, string mailTo, IServiceSaver serviceSaver)
+        public static void PrepareMail(IServiceContainer serviceContainer, IServiceFactory serviceFactory, string senderName, string smtpUser, string mailTo, IServiceSaver defaultSaver, IServiceSaver actionSaver)
         {
             var actionBan = "dotnet /_Data/CLI/VICFailToBan.dll _logban <ip> <name>";
             var actionUnban = "dotnet /_Data/CLI/VICFailToBan.dll _logunban <ip> <name>";
@@ -133,8 +133,8 @@ namespace FailToBan.Server
             defaultService.SetRule("DEFAULT", RuleType.ActionVic, actionBanVic);
             defaultService.SetRule("DEFAULT", RuleType.Action, "%(action_vic)s");
 
-            serviceSaver?.Save(sendMailService);
-            serviceSaver?.Save(defaultService);
+            actionSaver?.Save(sendMailService);
+            defaultSaver?.Save(defaultService);
         }
 
         public static void PrepareBanAction(IServiceContainer serviceContainer, IServiceSaver serviceSaver)
@@ -260,7 +260,7 @@ namespace FailToBan.Server
             return result;
         }
 
-        public static IEnumerable<(IPAddress, string)> BannedListStatus(string statusLogFile = Constants.StatusLogPath)
+        public static IEnumerable<(IPAddress, string)> BannedListStatus(string statusLogFile)
         {
             var result = new List<(IPAddress, string)>();
             var bans = ParseIps(statusLogFile);
@@ -423,7 +423,7 @@ namespace FailToBan.Server
             return CheckMailResult(result, mailLogFile);
         }
 
-        private static bool CheckMailResult(string result, string mailLogFile = Constants.MailLogPath)
+        private static bool CheckMailResult(string result, string mailLogFile)
         {
             if ((result != null) && Regex.IsMatch(result, @".*Email was sent successfully!.*"))
             {

@@ -9,11 +9,17 @@ namespace FailToBan.Client
     internal class Program
     {
         private bool run = false;
+        private Logger logger;
 
-        private void LogData(string text, Logger.From @from, Logger.LogType type) => Program.LogData(text, @from, type);
+        private async void LogData(string text, Logger.From @from, Logger.LogType type)
+        {
+            await logger.LogAsync(text, @from, type);
+            Console.WriteLine(text);
+        }
 
         private async Task Main(string[] args)
         {
+            logger = new Logger();
             try
             {
                 using (var clientPipe = new ClientPipe("VICFTB"))

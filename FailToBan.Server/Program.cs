@@ -16,7 +16,7 @@ namespace FailToBan.Server
                     while (true)
                     {
                         Console.WriteLine("Waiting for connection");
-                        int clientId = await server.WaitForConnectionAsync();
+                        var clientId = await server.WaitForConnectionAsync();
                         Console.WriteLine($"Got connection with id {clientId}");
                         var processTask = ProcessClientAsync(server, clientId).ContinueWith(task =>
                         {

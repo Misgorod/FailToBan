@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace FailToBan.Server
+namespace FailToBan.Client
 {
     public class Logger
     {
@@ -29,32 +29,29 @@ namespace FailToBan.Server
         public Logger(string LogPath = "/_Data/Logs/CLI/Main.log")
         {
             pathToLog = LogPath;
-            var Stream = File.Create(pathToLog);
-            if (File.Exists(pathToLog))
+            if (!File.Exists(pathToLog))
             {
-                return;
-            }
-
-            var PathList = pathToLog.Split('/').ToList();
-            for (var i = 2; i < PathList.Count; i++)
-            {
-                var TempPath = string.Join('/', PathList.GetRange(0, i).ToArray());
-                if (!Directory.Exists(TempPath))
+                List<string> PathList = pathToLog.Split('/').ToList();
+                for (int i = 2; i < PathList.Count; i++)
                 {
-                    Directory.CreateDirectory(TempPath);
+                    string TempPath = string.Join('/', PathList.GetRange(0, i).ToArray());
+                    if (!Directory.Exists(TempPath))
+                    {
+                        Directory.CreateDirectory(TempPath);
+                    }
                 }
+                FileStream Stream = File.Create(pathToLog);
+                Stream.Close();
             }
-
-            Stream.Close();
         }
 
         private string PrepareText(string Text, From From, LogType Type)
         {
-            var result = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            result += " " + FromToText(From);
-            result += " " + TypeToText(Type);
-            result += " " + Text;
-            return result;
+            string Result = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            Result += " " + FromToText(From);
+            Result += " " + TypeToText(Type);
+            Result += " " + Text;
+            return Result;
         }
 
         public async void Log(string Text, From From, LogType Type)

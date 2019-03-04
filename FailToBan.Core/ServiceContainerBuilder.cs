@@ -21,6 +21,9 @@ namespace FailToBan.Core
             this.serviceContainer = new ServiceContainer();
         }
 
+        public ServiceContainerBuilder(IServiceFactory serviceFactory, ISettingFactory settingFactory) : this(new FileSystem(), serviceFactory, settingFactory)
+        { }
+
         public IServiceContainer Build()
         {
             var result = serviceContainer;
