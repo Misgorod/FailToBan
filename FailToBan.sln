@@ -7,9 +7,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FailToBan.Core", "FailToBan
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FailToBan.Core.Tests", "FailToBan.Core.Tests\FailToBan.Core.Tests.csproj", "{DBFAF784-A8A7-4D13-96D5-9861EF16DF1E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FailToBan.Server", "FailToBan.Server\FailToBan.Server.csproj", "{3630D3F6-53C3-4E1C-B622-6906109E14B3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FailToBan.Server", "FailToBan.Server\FailToBan.Server.csproj", "{3630D3F6-53C3-4E1C-B622-6906109E14B3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FailToBan.Client", "FailToBan.Client\FailToBan.Client.csproj", "{5D9127BE-796F-4EA9-AA40-1DFA4441488D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FailToBan.Client", "FailToBan.Client\FailToBan.Client.csproj", "{5D9127BE-796F-4EA9-AA40-1DFA4441488D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{CC5BF37C-51F3-4D6D-BE40-3D2F9C40B4DB}"
+	ProjectSection(SolutionItems) = preProject
+		build.ps1 = build.ps1
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

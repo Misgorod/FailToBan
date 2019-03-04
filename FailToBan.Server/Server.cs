@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using FailToBan.Core;
 using FailToBan.Server.Shells;
@@ -155,7 +156,7 @@ namespace FailToBan.Server
 
             Commands.PrepareMail(serviceContainer, serviceFactory,  senderName, smtpUser, mailTo, defaultSaver, actionSaver);
             Commands.PrepareFilters(Constants.FiltersListPath);
-            Commands.PrepareWhiteList(settingContainer);
+            Commands.PrepareWhiteList(serviceContainer, Constants.WhiteListPath, defaultSaver);
         }
 
         /// <summary>
@@ -168,7 +169,7 @@ namespace FailToBan.Server
         {
             LogData($"Сообщение от клиента с id = {id}", Logger.From.Server, Logger.LogType.Debug);
 
-            var (command, values) = Extension.ParseArgs(result.Split("\n").ToList());
+            var (command, values) = ParseArgs(result.Split("\n").ToList());
             LogData($"Команда: {command}", Logger.From.Server, Logger.LogType.Debug);
             LogData($"Значения: {string.Join(" ", values)}", Logger.From.Server, Logger.LogType.Debug);
 
@@ -176,10 +177,14 @@ namespace FailToBan.Server
             {
                 case "create":
                     LogData("Запрошено интерактивное создание jail", Logger.From.Server, Logger.LogType.Debug);
-                    sessions.Add(id, new CreateShell(id, settingContainer, logger));
+                    var createShell = new Shell();
+                    var createState = new PrepareCreateState(createShell, serviceContainer, serviceFactory,
+                        jailSaver, filterSaver);
+                    createShell.SetState(createState);
+                    sessions.Add(id, createShell);
                     var createMessage = sessions[id].Get(values.ToArray());
                     LogData(createMessage, Logger.From.Server, Logger.LogType.Debug);
-                    if (createMessage == $"\n{Constants.CreateTexts[Constants.CreateSteps.Exit]}")
+                    if (Regex.IsMatch(createMessage, $"{Constants.ShellTexts[Constants.ShellSteps.Exit]}"))
                     {
                         return (createMessage, false);
                     }
@@ -188,10 +193,14 @@ namespace FailToBan.Server
 
                 case "edit":
                     LogData("Запрошено интерактивное изменение jail", Logger.From.Server, Logger.LogType.Debug);
-                    sessions.Add(id, new EditShell(id, settingContainer, logger));
+                    var editShell = new Shell();
+                    var editState = new PrepareEditState(editShell, serviceContainer, serviceFactory,
+                        jailSaver, filterSaver);
+                    editShell.SetState(editState);
+                    sessions.Add(id, editShell);
                     var editMessage = sessions[id].Get(values.ToArray());
                     LogData(editMessage, Logger.From.Server, Logger.LogType.Debug);
-                    if (editMessage == $"\n{Constants.EditTexts[Constants.EditSteps.Exit]}")
+                    if (Regex.IsMatch(editMessage, $"{Constants.ShellTexts[Constants.ShellSteps.Exit]}"))
                     {
                         return (editMessage, false);
                     }
@@ -236,7 +245,7 @@ namespace FailToBan.Server
 
                 if (currentSendTime >= nextSendTime)
                 {
-                    Commands.SendMail();
+                    Commands.SendMail(Constants.MailLogPath);
                     nextSendTime = currentSendTime + time;
 
                     LogData($"currentTime: {currentSendTime}", Logger.From.Server, Logger.LogType.Debug);
@@ -258,7 +267,7 @@ namespace FailToBan.Server
                         var builder = new StringBuilder();
                         foreach (var jail in values)
                         {
-                            var jailInfo = Commands.ManageJail(settingContainer, jail);
+                            var jailInfo = Commands.ManageJail(serviceContainer, jail);
                             var jailRules = PrintJailRules(jail, jailInfo, id);
                             builder.AppendLine(jailRules);
                         }
@@ -268,7 +277,7 @@ namespace FailToBan.Server
                     else
                     {
                         LogData("Запрошен вывод параметров jail", Logger.From.Server, Logger.LogType.Debug);
-                        var jails = Commands.ManageJail(settingContainer);
+                        var jails = Commands.ManageJail(serviceContainer);
                         return PrintJailsStatus(jails, id);
                     }
 
@@ -276,7 +285,7 @@ namespace FailToBan.Server
                     LogData("Запрошено включение jail", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 1)
                     {
-                        Commands.ChangeJailRule(settingContainer, values[0], "enabled", "true");
+                        Commands.ChangeJailRule(serviceContainer, values[0], "enabled", "true", jailSaver);
                         "fail2ban-client restart".Bash();
                         return "Сервис был включён";
                     }
@@ -290,7 +299,7 @@ namespace FailToBan.Server
                     LogData("Запрошено выключение jail", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 1)
                     {
-                        Commands.ChangeJailRule(settingContainer, values[0], "enabled", "false");
+                        Commands.ChangeJailRule(serviceContainer, values[0], "enabled", "false", jailSaver);
                         "fail2ban-client restart".Bash();
                         return "Сервис был выключен";
                     }
@@ -310,7 +319,7 @@ namespace FailToBan.Server
                             return "Для включения или выключения сервисов используйте команду enable или disable";
                         }
 
-                        Commands.ChangeJailRule(settingContainer, values[0], values[1], values[2]);
+                        Commands.ChangeJailRule(serviceContainer, values[0], values[1], values[2], jailSaver);
                         "fail2ban-client restart".Bash();
                         return "Правило сервиса было изменено";
                     }
@@ -325,7 +334,7 @@ namespace FailToBan.Server
                     LogData("Запрошено изменение action", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 4)
                     {
-                        Commands.ChangeActionRule(settingContainer, values[0], values[3], values[1], values[2]);
+                        Commands.ChangeActionRule(serviceContainer, values[0], values[3], values[1], values[2], actionSaver);
                         "fail2ban-client restart".Bash();
                         return "Действие было изменено";
                     }
@@ -339,7 +348,7 @@ namespace FailToBan.Server
                     LogData("Запрошено изменение filter", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 4)
                     {
-                        Commands.ChangeFilterRule(settingContainer, values[0], values[1], values[2], values[3]);
+                        Commands.ChangeFilterRule(serviceContainer, values[0], values[1], values[2], values[3], filterSaver);
                         "fail2ban-client restart".Bash();
                         return "Фильтр был изменён";
                     }
@@ -359,10 +368,10 @@ namespace FailToBan.Server
                     if (values.Count == 0)
                     {
                         var builder = new StringBuilder();
-                        var blackList = Commands.BlackListStatus();
+                        var blackList = Commands.BlackListStatus(Constants.BlackListPath);
                         var blackAddresses = PrintAddressList(blackList, id, "Addresses in black list:");
                         builder.AppendLine(blackAddresses);
-                        var bannedList = Commands.BannedListStatus();
+                        var bannedList = Commands.BannedListStatus(Constants.StatusLogPath);
                         var bannedAddresses = PrintAddressList(bannedList, id, "Banned addresses:");
                         builder.AppendLine(bannedAddresses);
                         return builder.ToString();
@@ -376,7 +385,7 @@ namespace FailToBan.Server
                     LogData("Запрошен бан ip.", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 2 &&
                         IPAddress.TryParse(values[0], out var bannedIp) &&
-                        Commands.Ban(bannedIp, values[1]))
+                        Commands.Ban(bannedIp, values[1], Constants.BlackListPath))
                     {
                         return "Ip адрес был забанен";
                     }
@@ -390,7 +399,7 @@ namespace FailToBan.Server
                     LogData("Запрошен разбан ip.", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 2 &&
                         IPAddress.TryParse(values[0], out var unbannedIp) &&
-                        Commands.Unban(unbannedIp, values[1]))
+                        Commands.Unban(unbannedIp, values[1], Constants.BlackListPath))
                     {
                         return "Ip адрес был разбанен";
                     }
@@ -413,7 +422,7 @@ namespace FailToBan.Server
 
                 case "sendmail":
                     LogData("Отправка письма.", Logger.From.Server, Logger.LogType.Debug);
-                    if (values.Count == 0 && Commands.SendMail())
+                    if (values.Count == 0 && Commands.SendMail(Constants.MailLogPath))
                     {
                         return "Письмо было отправлено";
                     }
@@ -427,7 +436,7 @@ namespace FailToBan.Server
                     LogData("Запрошено логгирование бана ip.", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 2 &&
                         IPAddress.TryParse(values[0], out var logBannedIp) &&
-                        Commands.LogBan(logBannedIp, values[1]))
+                        Commands.LogBan(logBannedIp, values[1], Constants.MailLogPath, Constants.StatusLogPath))
                     {
                         LogData("Ip ban was logged", Logger.From.Server, Logger.LogType.Message);
                         return "Бан ip адреса был залогирован";
@@ -442,7 +451,7 @@ namespace FailToBan.Server
                     LogData("Запрошено логгирование разбана ip.", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 2 &&
                         IPAddress.TryParse(values[0], out var logUnbannedIp) &&
-                        Commands.LogUnban(logUnbannedIp, values[1]))
+                        Commands.LogUnban(logUnbannedIp, values[1], Constants.MailLogPath, Constants.StatusLogPath, Constants.BlackListPath))
                     {
                         return "Разбан ip адреса был залогирован";
                     }
@@ -497,6 +506,36 @@ namespace FailToBan.Server
             }
 
             return builder.ToString();
+        }
+
+        private static (string command, List<string> values) ParseArgs(List<string> args)
+        {
+            string command = null;
+
+            if (args.Count >= 1)
+            {
+                var values = new List<string>();
+
+                if (args.Count >= 2)
+                {
+                    for (int i = 1; i < args.Count; i++)
+                    {
+                        if (Constants.ValueRegex.IsMatch(args[i]))
+                        {
+                            values.Add(args[i]);
+                        }
+                    }
+                }
+
+                if (Constants.CommandRegex.IsMatch(args[0]))
+                {
+                    command = args[0];
+                }
+
+                return (command, values);
+            }
+
+            return ("", null);
         }
 
         public static void LogData(string text, Logger.From @from, Logger.LogType type)

@@ -15,12 +15,10 @@ namespace FailToBan.Server.Shells
 
         public string Message { get; protected set; }
 
-        public ShellState(Shell shell, IServiceContainer serviceContainer, IService currentJail, IService currentFilter, IServiceFactory serviceFactory, IServiceSaver jailSaver, IServiceSaver filterSaver)
+        public ShellState(Shell shell, IServiceContainer serviceContainer, IServiceFactory serviceFactory, IServiceSaver jailSaver, IServiceSaver filterSaver)
         {
             this.shell = shell;
             this.serviceContainer = serviceContainer;
-            this.currentJail = currentJail;
-            this.currentFilter = currentFilter;
             this.serviceFactory = serviceFactory;
             this.jailSaver = jailSaver;
             this.filterSaver = filterSaver;

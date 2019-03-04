@@ -546,5 +546,43 @@ namespace FailToBan.Server
                 }
             }
         }
+
+        public static void PrepareWhiteList(IServiceContainer serviceContainer, string path, IServiceSaver defaultSaver)
+        {
+            if (!File.Exists(path))
+            {
+                File.Create(path);
+                return;
+            }
+
+            var ipAddresses = new List<IPAddress>();
+            var builder = new StringBuilder();
+            using (var reader = new StreamReader(File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)))
+            {
+                string line = reader.ReadLine();
+                while (line != null)
+                {
+                    if (IPAddress.TryParse(line, out var ipAddress))
+                    {
+                        ipAddresses.Add(ipAddress);
+                    }
+                    else if (Regex.IsMatch(line, @"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$"))
+                    {
+                        builder.Append(line + " ");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Ip адрес {line} не распознан и не добавлен в white list");
+                    }
+                    line = reader.ReadLine();
+                }
+            }
+
+            builder.AppendJoin(" ", ipAddresses);
+
+            var defaultJail = serviceContainer.GetDefault();
+            defaultJail.SetRule("DEFAULT", RuleType.Ignoreip, builder.ToString());
+            defaultSaver.Save(defaultJail);
+        }
     }
 }
