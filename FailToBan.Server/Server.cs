@@ -27,96 +27,79 @@ namespace FailToBan.Server
         private static async Task Main(string[] args)
         {
             logger = new Logger();
-            LogData("Логгер запущен", Logger.From.Unknown, Logger.LogType.Debug);
+            await LogDataAsync("Логгер запущен", Logger.From.Unknown, Logger.LogType.Debug);
 
             if (!Directory.Exists("/_Data/Confs/Jails"))
             {
-                LogData("Создание каталога для Jail'ов", Logger.From.Unknown, Logger.LogType.Debug);
+                await LogDataAsync("Создание каталога для Jail'ов", Logger.From.Unknown, Logger.LogType.Debug);
                 Directory.CreateDirectory("/_Data/Confs/Jails");
             }
 
-            try
-            {
-                await Start();
-            }
-            catch (VicException e)
-            {
-                LogData("Message: " + e.Message, Logger.From.Unknown, Logger.LogType.Error);
-                LogData("Type: " + e.GetType().ToString(), Logger.From.Unknown, Logger.LogType.Error);
-                LogData("Trace: " + e.StackTrace, Logger.From.Unknown, Logger.LogType.Error);
-            }
-            catch (Exception e)
-            {
-                LogData("Message: " + e.Message, Logger.From.Unknown, Logger.LogType.Error);
-                LogData("Type: " + e.GetType().ToString(), Logger.From.Unknown, Logger.LogType.Error);
-                LogData("Trace: " + e.StackTrace, Logger.From.Unknown, Logger.LogType.Error);
-                throw e;
-            }
+            await StartAsync();
         }
 
-        private static async Task Start()
+        private static async Task StartAsync()
         {
-            try
+            using (var server = new ServerPipe("VICFTB"))
             {
-                using (var server = new ServerPipe("VICFTB"))
+                try
                 {
-                    try
-                    {
-                        settingFactory = new SettingFactory(Constants.SectionRegex, Constants.KeyValueRegex, Constants.ContinueRegex);
-                        serviceFactory = new ServiceFactory(settingFactory);
-                        IServiceContainerBuilder serviceContainerBuilder = new ServiceContainerBuilder(serviceFactory, settingFactory);
-                        serviceContainer = serviceContainerBuilder
-                            .BuildDefault("/etc/fail2ban")
-                            .BuildJails("/etc/fail2ban/jail.d")
-                            .BuildJails("/_Data/Confs/Jails")
-                            .BuildActions("/etc/fail2ban/action.d")
-                            .BuildFilters("/etc/fail2ban/filter.d")
-                            .BuildFilters("/_Data/Confs/Filters")
-                            .Build();
+                    defaultSaver = new ServiceSaver("/etc/fail2ban");
+                    jailSaver = new ServiceSaver("/_Data/Confs/Jails");
+                    var customFilterSaver = new ServiceSaver("/_Data/Confs/Filters");
+                    var originFilterSaver = new ServiceSaver("/etc/fail2ban/filter.d");
+                    filterSaver = new ServiceSaverAdapter(customFilterSaver, originFilterSaver);
+                    actionSaver = new ServiceSaver("/etc/fail2ban/action.d");
 
-                        LogData("Контейнер инициализирован", Logger.From.Server, Logger.LogType.Debug);
-                        Prepare();
-                    }
-                    catch (Exception e)
-                    {
-                        LogData("Подготовка не удалась", Logger.From.Server, Logger.LogType.Debug);
-                        throw e.InnerException;
-                    }
-                    "fail2ban-client start".Bash();
-                    LogData("Fail2Ban запущен", Logger.From.Server, Logger.LogType.Debug);
-                    sessions = new Dictionary<int, Shell>();
+                    settingFactory = new SettingFactory(Constants.SectionRegex, Constants.KeyValueRegex, Constants.ContinueRegex);
+                    serviceFactory = new ServiceFactory(settingFactory);
+                    IServiceContainerBuilder serviceContainerBuilder = new ServiceContainerBuilder(serviceFactory, settingFactory);
+                    serviceContainer = serviceContainerBuilder
+                        .BuildDefault("/etc/fail2ban")
+                        .BuildJails("/etc/fail2ban/jail.d")
+                        .BuildJails("/_Data/Confs/Jails")
+                        .BuildActions("/etc/fail2ban/action.d")
+                        .BuildFilters("/etc/fail2ban/filter.d")
+                        .BuildFilters("/_Data/Confs/Filters")
+                        .Build();
 
-                    var mailTask = MailSendProcess().ContinueWith(task =>
-                    {
-                        LogData($"Возникло исключение при отправле письма", Logger.From.Server, Logger.LogType.Error);
-                        var exception = task.Exception;
-                        LogData(exception?.Message, Logger.From.Server, Logger.LogType.Error);
-                        LogData(exception?.InnerException.Message, Logger.From.Server, Logger.LogType.Error);
-                        LogData(exception?.StackTrace, Logger.From.Server, Logger.LogType.Error);
-                    }, TaskContinuationOptions.OnlyOnFaulted);
-
-                    while (true)
-                    {
-                        var clientId = await server.WaitForConnectionAsync();
-                        LogData($"Подключился клиент с id: {clientId}", Logger.From.Server, Logger.LogType.Debug);
-                        var processTask = ProcessClientAsync(server, clientId).ContinueWith(task =>
-                        {
-                            LogData($"Возникло исключения у клиента с id: {clientId}", Logger.From.Server, Logger.LogType.Error);
-                            var exception = task.Exception;
-                            LogData(exception?.Message, Logger.From.Server, Logger.LogType.Error);
-                            LogData(exception?.InnerException.Message, Logger.From.Server, Logger.LogType.Error);
-                            LogData(exception?.StackTrace, Logger.From.Server, Logger.LogType.Error);
-                        }, TaskContinuationOptions.OnlyOnFaulted);
-                    }
+                    await LogDataAsync("Контейнер инициализирован", Logger.From.Server, Logger.LogType.Debug);
+                    await PrepareAsync();
                 }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-            }
-            finally
-            {
-                Console.ReadLine();
+                catch (Exception e)
+                {
+                    await LogDataAsync("Подготовка не удалась", Logger.From.Server, Logger.LogType.Debug);
+                    //Console.WriteLine(e.Message);
+                    //Console.WriteLine(e.StackTrace);
+                    if (e.InnerException != null) throw e.InnerException;
+                    throw e;
+                }
+                "fail2ban-client start".Bash();
+                await LogDataAsync("Fail2Ban запущен", Logger.From.Server, Logger.LogType.Debug);
+                sessions = new Dictionary<int, Shell>();
+
+                var mailTask = MailSendProcessAsync().ContinueWith(async task =>
+                {
+                    await LogDataAsync($"Возникло исключение при отправле письма", Logger.From.Server, Logger.LogType.Error);
+                    var exception = task.Exception;
+                    await LogDataAsync(exception?.Message, Logger.From.Server, Logger.LogType.Error);
+                    await LogDataAsync(exception?.InnerException.Message, Logger.From.Server, Logger.LogType.Error);
+                    await LogDataAsync(exception?.StackTrace, Logger.From.Server, Logger.LogType.Error);
+                }, TaskContinuationOptions.OnlyOnFaulted);
+
+                while (true)
+                {
+                    var clientId = await server.WaitForConnectionAsync();
+                    await LogDataAsync($"Подключился клиент с id: {clientId}", Logger.From.Server, Logger.LogType.Debug);
+                    var processTask = ProcessClientAsync(server, clientId).ContinueWith(async task =>
+                    {
+                        await LogDataAsync($"Возникло исключения у клиента с id: {clientId}", Logger.From.Server, Logger.LogType.Error);
+                        var exception = task.Exception;
+                        await LogDataAsync(exception?.Message, Logger.From.Server, Logger.LogType.Error);
+                        await LogDataAsync(exception?.InnerException.Message, Logger.From.Server, Logger.LogType.Error);
+                        await LogDataAsync(exception?.StackTrace, Logger.From.Server, Logger.LogType.Error);
+                    }, TaskContinuationOptions.OnlyOnFaulted);
+                }
             }
         }
 
@@ -125,24 +108,31 @@ namespace FailToBan.Server
             while (server.IsConnected(clientId))
             {
                 var message = await server.ReadAsync(clientId);
-                var (response, con) = await ProcessMessageAsync(clientId, message);
-                //LogData($"Ответ сервера: {response}", Logger.From.Server, Logger.LogType.Debug);
-                if (con)
+                try
                 {
-                    await server.WriteAsync(response, clientId);
+                    var (response, con) = await ProcessMessageAsync(clientId, message);
+                    if (con)
+                    {
+                        await server.WriteAsync(response, clientId);
+                    }
+                    else
+                    {
+                        await server.WriteLastAsync(response, clientId);
+                    }
                 }
-                else
+                catch (Exception e)
                 {
-                    await server.WriteLastAsync(response, clientId);
+                    await server.WriteLastAsync($"Возникла ошибка: {e.Message}", clientId);
+                    throw e;
                 }
             }
         }
 
-        private static void Prepare()
+        private static async Task PrepareAsync()
         {
-            LogData("Подготовка почты и действий для бана", Logger.From.Server, Logger.LogType.Debug);
+            await LogDataAsync("Подготовка почты и действий для бана", Logger.From.Server, Logger.LogType.Debug);
 
-            Commands.PrepareBanAction(serviceContainer, actionSaver);
+            Commands.PrepareBanAction(serviceContainer, serviceFactory, settingFactory, actionSaver);
 
             var senderName = Environment.GetEnvironmentVariable("SenderName");
             var smtpUser = Environment.GetEnvironmentVariable("SMTPUser");
@@ -154,7 +144,7 @@ namespace FailToBan.Server
                 throw new Exception("Перед запуском нужно указать переменные окружения SMTPUser, MailTo SenderName и mailRepeatTime");
             }
 
-            Commands.PrepareMail(serviceContainer, serviceFactory,  senderName, smtpUser, mailTo, defaultSaver, actionSaver);
+            Commands.PrepareMail(serviceContainer, serviceFactory, settingFactory, senderName, smtpUser, mailTo, defaultSaver, actionSaver);
             Commands.PrepareFilters(Constants.FiltersListPath);
             Commands.PrepareWhiteList(serviceContainer, Constants.WhiteListPath, defaultSaver);
         }
@@ -167,77 +157,62 @@ namespace FailToBan.Server
         /// <returns>Кортеж из обработанного сообщения и логического значения, сообщающего продолжать ли серверу обработку этого клиента</returns>
         private static async Task<(string, bool)> ProcessMessageAsync(int id, string result)
         {
-            LogData($"Сообщение от клиента с id = {id}", Logger.From.Server, Logger.LogType.Debug);
+            await LogDataAsync($"Сообщение от клиента с id = {id}", Logger.From.Server, Logger.LogType.Debug);
 
-            var (command, values) = ParseArgs(result.Split("\n").ToList());
-            LogData($"Команда: {command}", Logger.From.Server, Logger.LogType.Debug);
-            LogData($"Значения: {string.Join(" ", values)}", Logger.From.Server, Logger.LogType.Debug);
+            var (command, values) = ParseArgsAsync(result.Split(" ").ToList());
+            await LogDataAsync($"Команда: {command}", Logger.From.Server, Logger.LogType.Debug);
+            await LogDataAsync($"Значения: {string.Join(" ", values)}", Logger.From.Server, Logger.LogType.Debug);
 
             switch (command)
             {
                 case "create":
-                    LogData("Запрошено интерактивное создание jail", Logger.From.Server, Logger.LogType.Debug);
+                    await LogDataAsync("Запрошено интерактивное создание jail", Logger.From.Server, Logger.LogType.Debug);
                     var createShell = new Shell();
                     var createState = new PrepareCreateState(createShell, serviceContainer, serviceFactory,
-                        jailSaver, filterSaver);
+                        settingFactory, jailSaver, filterSaver);
                     createShell.SetState(createState);
                     sessions.Add(id, createShell);
                     var createMessage = sessions[id].Get(values.ToArray());
-                    LogData(createMessage, Logger.From.Server, Logger.LogType.Debug);
-                    if (Regex.IsMatch(createMessage, $"{Constants.ShellTexts[Constants.ShellSteps.Exit]}"))
-                    {
-                        return (createMessage, false);
-                    }
-
                     return (createMessage, true);
 
                 case "edit":
-                    LogData("Запрошено интерактивное изменение jail", Logger.From.Server, Logger.LogType.Debug);
+                    await LogDataAsync("Запрошено интерактивное изменение jail", Logger.From.Server, Logger.LogType.Debug);
                     var editShell = new Shell();
                     var editState = new PrepareEditState(editShell, serviceContainer, serviceFactory,
-                        jailSaver, filterSaver);
+                        settingFactory, jailSaver, filterSaver);
                     editShell.SetState(editState);
                     sessions.Add(id, editShell);
                     var editMessage = sessions[id].Get(values.ToArray());
-                    LogData(editMessage, Logger.From.Server, Logger.LogType.Debug);
-                    if (Regex.IsMatch(editMessage, $"{Constants.ShellTexts[Constants.ShellSteps.Exit]}"))
-                    {
-                        return (editMessage, false);
-                    }
-
                     return (editMessage, true);
             }
 
             if (!sessions.ContainsKey(id))
             {
                 sessions.Add(id, null);
-                LogData("Команда", Logger.From.Server, Logger.LogType.Debug);
-                return (Command(command, values, id), false);
+                await LogDataAsync("Команда", Logger.From.Server, Logger.LogType.Debug);
+                return (await CommandAsync(command, values, id), false);
             }
 
             if (result == "q")
             {
-                LogData("Клиент запросил отключение", Logger.From.Server, Logger.LogType.Debug);
+                await LogDataAsync("Клиент запросил отключение", Logger.From.Server, Logger.LogType.Debug);
                 return ("Выход", false);
             }
 
-            LogData($"Клиент ввёл интерактивную команду \"{result}\"", Logger.From.Server, Logger.LogType.Debug);
-            return (sessions[id].Get(result.Split(" ")), true);
+            await LogDataAsync($"Клиент ввёл интерактивную команду \"{result}\"", Logger.From.Server, Logger.LogType.Debug);
+            var message = sessions[id].Get(result.Split(" "));
+            return Regex.IsMatch(message, $"{Constants.ShellTexts[Constants.ShellSteps.Exit]}") ? (message, false) : (message, true);
         }
 
-        private static async Task MailSendProcess()
+        private static async Task MailSendProcessAsync()
         {
             var mailRepeatTime = Environment.GetEnvironmentVariable("MailRepeatTime");
             if (!int.TryParse(mailRepeatTime, out var time))
             {
-                LogData("Переменная окружения MailRepeatTime не задана или задана в неверном формате", Logger.From.Server, Logger.LogType.Error);
+                await LogDataAsync("Переменная окружения MailRepeatTime не задана или задана в неверном формате", Logger.From.Server, Logger.LogType.Error);
             }
             var currentSendTime = DateTime.Now.Hour * 60 + DateTime.Now.Minute;
             var nextSendTime = time + time * (currentSendTime / time);
-
-            LogData($"mailRepeat: {time}", Logger.From.Server, Logger.LogType.Debug);
-            LogData($"currentTime: {currentSendTime}", Logger.From.Server, Logger.LogType.Debug);
-            LogData($"nextTime: {nextSendTime}", Logger.From.Server, Logger.LogType.Debug);
 
             while (true)
             {
@@ -248,25 +223,28 @@ namespace FailToBan.Server
                     Commands.SendMail(Constants.MailLogPath);
                     nextSendTime = currentSendTime + time;
 
-                    LogData($"currentTime: {currentSendTime}", Logger.From.Server, Logger.LogType.Debug);
-                    LogData($"nextTime: {nextSendTime}", Logger.From.Server, Logger.LogType.Debug);
+                    await LogDataAsync($"Попытка отправки письма", Logger.From.Server, Logger.LogType.Debug);
                 }
 
                 await Task.Delay(1000);
             }
         }
 
-        private static string Command(string command, List<string> values, int id)
+        private static async Task<string> CommandAsync(string command, IReadOnlyList<string> values, int id)
         {
             switch (command)
             {
                 case "manage":
                     if (values.Count > 0)
                     {
-                        LogData("Запрошен вывод состояния всех jail", Logger.From.Server, Logger.LogType.Debug);
+                        await LogDataAsync("Запрошен вывод состояния всех jail", Logger.From.Server, Logger.LogType.Debug);
                         var builder = new StringBuilder();
                         foreach (var jail in values)
                         {
+                            if (serviceContainer.GetJail(jail) == null)
+                            {
+                                return "Ошибка: Сервис не существует или не настроен";
+                            }
                             var jailInfo = Commands.ManageJail(serviceContainer, jail);
                             var jailRules = PrintJailRules(jail, jailInfo, id);
                             builder.AppendLine(jailRules);
@@ -276,13 +254,13 @@ namespace FailToBan.Server
                     }
                     else
                     {
-                        LogData("Запрошен вывод параметров jail", Logger.From.Server, Logger.LogType.Debug);
+                        await LogDataAsync("Запрошен вывод параметров jail", Logger.From.Server, Logger.LogType.Debug);
                         var jails = Commands.ManageJail(serviceContainer);
-                        return PrintJailsStatus(jails, id);
+                        return PrintJailsStatusAsync(jails, id);
                     }
 
                 case "enable":
-                    LogData("Запрошено включение jail", Logger.From.Server, Logger.LogType.Debug);
+                    await LogDataAsync("Запрошено включение jail", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 1)
                     {
                         Commands.ChangeJailRule(serviceContainer, values[0], "enabled", "true", jailSaver);
@@ -296,7 +274,7 @@ namespace FailToBan.Server
 
 
                 case "disable":
-                    LogData("Запрошено выключение jail", Logger.From.Server, Logger.LogType.Debug);
+                    await LogDataAsync("Запрошено выключение jail", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 1)
                     {
                         Commands.ChangeJailRule(serviceContainer, values[0], "enabled", "false", jailSaver);
@@ -308,63 +286,14 @@ namespace FailToBan.Server
                         return "Неверное количество аргументов";
                     }
 
-
-                case "setjail":
-                    // jail, rule, value
-                    LogData("Запрошено изменение jail", Logger.From.Server, Logger.LogType.Debug);
-                    if (values.Count == 3)
-                    {
-                        if (values[1] == "enabled" || values[1] == "disabled")
-                        {
-                            return "Для включения или выключения сервисов используйте команду enable или disable";
-                        }
-
-                        Commands.ChangeJailRule(serviceContainer, values[0], values[1], values[2], jailSaver);
-                        "fail2ban-client restart".Bash();
-                        return "Правило сервиса было изменено";
-                    }
-                    else
-                    {
-                        return "Сервис не был изменён";
-                    }
-
-
-                case "setaction":
-                    // action, section, rule, value
-                    LogData("Запрошено изменение action", Logger.From.Server, Logger.LogType.Debug);
-                    if (values.Count == 4)
-                    {
-                        Commands.ChangeActionRule(serviceContainer, values[0], values[3], values[1], values[2], actionSaver);
-                        "fail2ban-client restart".Bash();
-                        return "Действие было изменено";
-                    }
-                    else
-                    {
-                        return "Действие не было изменено";
-                    }
-
-                case "setfilter":
-                    // filter, section, rule, value
-                    LogData("Запрошено изменение filter", Logger.From.Server, Logger.LogType.Debug);
-                    if (values.Count == 4)
-                    {
-                        Commands.ChangeFilterRule(serviceContainer, values[0], values[1], values[2], values[3], filterSaver);
-                        "fail2ban-client restart".Bash();
-                        return "Фильтр был изменён";
-                    }
-                    else
-                    {
-                        return "Фильтр не был изменён";
-                    }
-
                 case "stop":
-                    LogData("Запрошена остановка контейнера.", Logger.From.Server, Logger.LogType.Debug);
+                    await LogDataAsync("Запрошена остановка контейнера.", Logger.From.Server, Logger.LogType.Debug);
                     "fail2ban-client stop".Bash();
                     Environment.Exit(0);
                     return "Контейнер был остановлен";
 
                 case "status":
-                    LogData("Запрошен вывод статуса забаненных адресов.", Logger.From.Server, Logger.LogType.Debug);
+                    await LogDataAsync("Запрошен вывод статуса забаненных адресов.", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 0)
                     {
                         var builder = new StringBuilder();
@@ -382,10 +311,10 @@ namespace FailToBan.Server
                     }
 
                 case "ban":
-                    LogData("Запрошен бан ip.", Logger.From.Server, Logger.LogType.Debug);
+                    await LogDataAsync("Запрошен бан ip.", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 2 &&
                         IPAddress.TryParse(values[0], out var bannedIp) &&
-                        Commands.Ban(bannedIp, values[1], Constants.BlackListPath))
+                        Commands.Ban(bannedIp, values[1], Constants.BlackListPath, Constants.WhiteListPath))
                     {
                         return "Ip адрес был забанен";
                     }
@@ -396,7 +325,7 @@ namespace FailToBan.Server
 
                 case "unban":
                     // ip, service
-                    LogData("Запрошен разбан ip.", Logger.From.Server, Logger.LogType.Debug);
+                    await LogDataAsync("Запрошен разбан ip.", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 2 &&
                         IPAddress.TryParse(values[0], out var unbannedIp) &&
                         Commands.Unban(unbannedIp, values[1], Constants.BlackListPath))
@@ -409,7 +338,7 @@ namespace FailToBan.Server
                     }
 
                 case "reban":
-                    LogData("Запрошен разбан всех ip и бан чёрного списка.", Logger.From.Server, Logger.LogType.Debug);
+                    await LogDataAsync("Запрошен разбан всех ip и бан чёрного списка.", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 0)
                     {
                         Commands.Reban();
@@ -421,7 +350,7 @@ namespace FailToBan.Server
                     }
 
                 case "sendmail":
-                    LogData("Отправка письма.", Logger.From.Server, Logger.LogType.Debug);
+                    await LogDataAsync("Отправка письма.", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 0 && Commands.SendMail(Constants.MailLogPath))
                     {
                         return "Письмо было отправлено";
@@ -433,12 +362,12 @@ namespace FailToBan.Server
 
                 case "_logban":
                     // ip, service
-                    LogData("Запрошено логгирование бана ip.", Logger.From.Server, Logger.LogType.Debug);
+                    await LogDataAsync("Запрошено логгирование бана ip.", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 2 &&
                         IPAddress.TryParse(values[0], out var logBannedIp) &&
-                        Commands.LogBan(logBannedIp, values[1], Constants.MailLogPath, Constants.StatusLogPath))
+                        Commands.LogBan(logBannedIp, values[1], Constants.MailLogPath, Constants.StatusLogPath, Constants.WhiteListPath))
                     {
-                        LogData("Ip ban was logged", Logger.From.Server, Logger.LogType.Message);
+                        await LogDataAsync("Ip ban was logged", Logger.From.Server, Logger.LogType.Message);
                         return "Бан ip адреса был залогирован";
                     }
                     else
@@ -448,7 +377,7 @@ namespace FailToBan.Server
 
                 case "_logunban":
                     // ip, service
-                    LogData("Запрошено логгирование разбана ip.", Logger.From.Server, Logger.LogType.Debug);
+                    await LogDataAsync("Запрошено логгирование разбана ip.", Logger.From.Server, Logger.LogType.Debug);
                     if (values.Count == 2 &&
                         IPAddress.TryParse(values[0], out var logUnbannedIp) &&
                         Commands.LogUnban(logUnbannedIp, values[1], Constants.MailLogPath, Constants.StatusLogPath, Constants.BlackListPath))
@@ -467,7 +396,7 @@ namespace FailToBan.Server
 
 
 
-        private static string PrintJailsStatus(Dictionary<string, bool> jails, int id)
+        private static string PrintJailsStatusAsync(Dictionary<string, bool> jails, int id)
         {
             var builder = new StringBuilder();
             foreach (var jail in jails.Where(s => s.Value))
@@ -491,7 +420,6 @@ namespace FailToBan.Server
             {
                 builder.AppendLine($"{rule} = {value}");
             }
-            LogData(builder.ToString(), Logger.From.Server, Logger.LogType.Debug);
 
             return builder.ToString();
         }
@@ -508,39 +436,37 @@ namespace FailToBan.Server
             return builder.ToString();
         }
 
-        private static (string command, List<string> values) ParseArgs(List<string> args)
+        private static (string command, List<string> values) ParseArgsAsync(IReadOnlyList<string> args)
         {
             string command = null;
 
-            if (args.Count >= 1)
-            {
-                var values = new List<string>();
+            if (args.Count < 1) return ("", null);
 
-                if (args.Count >= 2)
+            var values = new List<string>();
+
+            if (args.Count >= 2)
+            {
+                for (var i = 1; i < args.Count; i++)
                 {
-                    for (int i = 1; i < args.Count; i++)
+                    if (Constants.ValueRegex.IsMatch(args[i]))
                     {
-                        if (Constants.ValueRegex.IsMatch(args[i]))
-                        {
-                            values.Add(args[i]);
-                        }
+                        values.Add(args[i]);
                     }
                 }
-
-                if (Constants.CommandRegex.IsMatch(args[0]))
-                {
-                    command = args[0];
-                }
-
-                return (command, values);
             }
 
-            return ("", null);
+            if (Constants.CommandRegex.IsMatch(args[0]))
+            {
+                command = args[0];
+            }
+
+            return (command, values);
+
         }
 
-        public static void LogData(string text, Logger.From @from, Logger.LogType type)
+        private static async Task LogDataAsync(string text, Logger.From @from, Logger.LogType type)
         {
-            logger.Log(text, @from, type);
+            await logger.LogAsync(text, @from, type);
             Console.WriteLine(text);
         }
     }

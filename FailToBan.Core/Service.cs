@@ -10,15 +10,11 @@ namespace FailToBan.Core
         public ISetting ConfSetting { get; set; }
         public ISetting LocalSetting { get; set; }
 
-        public Service(ISetting confSetting, ISetting localSetting, string name)
+        public Service(string name, ISetting localSetting)
         {
-            ConfSetting = confSetting;
-            LocalSetting = localSetting;
             Name = name;
+            LocalSetting = localSetting;
         }
-
-        public Service(ISetting localSetting, string name) : this(null, localSetting, name)
-        { }
 
         public virtual string GetRule(string section, RuleType type)
         {
@@ -29,14 +25,17 @@ namespace FailToBan.Core
 
         public virtual void SetRule(string sectionName, RuleType type, string value)
         {
-            var section = LocalSetting.GetSection(sectionName) ?? new Section();
+            var section = LocalSetting.GetOrCreateSection(sectionName);
             section.SetRule(type, value);
             LocalSetting.AddSection(sectionName, section);
         }
 
         public virtual IService Clone()
         {
-            return new Service(ConfSetting.Clone(), LocalSetting.Clone(), Name);
+            return new Service(Name, LocalSetting.Clone())
+            {
+                ConfSetting = ConfSetting?.Clone(),
+            };
         }
     }
 }

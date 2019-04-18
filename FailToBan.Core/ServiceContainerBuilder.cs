@@ -1,7 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.IO.Abstractions;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace FailToBan.Core
@@ -28,6 +31,21 @@ namespace FailToBan.Core
         {
             var result = serviceContainer;
             serviceContainer = new ServiceContainer();
+            //Console.WriteLine("JAILS\n");
+            //foreach (var (name, jail) in result.Jails)
+            //{
+            //    Console.WriteLine($"{name} = {jail.Name}");
+            //}
+            //Console.WriteLine("ACTIONS\n");
+            //foreach (var (name, jail) in result.Actions)
+            //{
+            //    Console.WriteLine($"{name} = {jail.Name}");
+            //}
+            //Console.WriteLine("FILTERS\n");
+            //foreach (var (name, jail) in result.Jails)
+            //{
+            //    Console.WriteLine($"{name} = {jail.Name}");
+            //}
             return result;
         }
 
@@ -35,6 +53,7 @@ namespace FailToBan.Core
         {
             var jailConfPath = fileSystem.Path.Combine(path, "jail.conf");
             var jailLocalPath = fileSystem.Path.Combine(path, "jail.local");
+            if (!fileSystem.File.Exists(jailLocalPath)) fileSystem.File.Create(jailLocalPath).Dispose();
             var jailConfText = ReadSettingFromPath(jailConfPath);
             var jailLocalText = ReadSettingFromPath(jailLocalPath);
 
@@ -46,13 +65,13 @@ namespace FailToBan.Core
 
         private string ReadSettingFromPath(string path)
         {
-            if (!fileSystem.File.Exists(path))
+            var result = "";
+            using (var reader = new StreamReader(fileSystem.File.Open(path, FileMode.Open, FileAccess.Read, FileShare.None)))
             {
-                throw new VicException($"Setting at {path} doesn't exists");
+                result = reader.ReadToEnd();
             }
 
-            var settingText = fileSystem.File.ReadAllText(path);
-            return settingText;
+            return result;
         }
 
         public IServiceContainerBuilder BuildJails(string path)
@@ -79,8 +98,8 @@ namespace FailToBan.Core
                     }
                     else
                     {
-                        jail = serviceFactory.BuildJail(fileName, defaultJail);
-                        jail.ConfSetting = confSetting;
+                        var localSetting = settingFactory.Build();
+                        jail = serviceFactory.BuildJail(fileName, confSetting, localSetting, defaultJail);
                         serviceContainer.SetJail(jail);
                     }
                 }
@@ -95,8 +114,7 @@ namespace FailToBan.Core
                     }
                     else
                     {
-                        jail = serviceFactory.BuildJail(fileName, defaultJail);
-                        jail.LocalSetting = localSetting;
+                        jail = serviceFactory.BuildJail(fileName, localSetting, defaultJail);
                         serviceContainer.SetJail(jail);
                     }
                 }
@@ -114,6 +132,7 @@ namespace FailToBan.Core
                 var fileNameWithExt = fileSystem.Path.GetFileName(file);
                 if (Regex.IsMatch(fileNameWithExt, @"[\w\d\-_]+.conf$"))
                 {
+                    //Console.WriteLine(fileName);
                     var confText = ReadSettingFromPath(file);
                     var confSetting = settingFactory.Build(confText);
                     var action = serviceContainer.GetAction(fileName);
@@ -176,16 +195,16 @@ namespace FailToBan.Core
                 {
                     var localText = ReadSettingFromPath(file);
                     var localSetting = settingFactory.Build(localText);
-                    var action = serviceContainer.GetFilter(fileName);
-                    if (action != null)
+                    var filter = serviceContainer.GetFilter(fileName);
+                    if (filter != null)
                     {
-                        action.LocalSetting = localSetting;
+                        filter.LocalSetting = localSetting;
                     }
                     else
                     {
-                        action = serviceFactory.BuildService(fileName);
-                        action.LocalSetting = localSetting;
-                        serviceContainer.SetFilter(action);
+                        filter = serviceFactory.BuildService(fileName);
+                        filter.LocalSetting = localSetting;
+                        serviceContainer.SetFilter(filter);
                     }
                 }
             }

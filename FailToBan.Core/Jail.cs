@@ -4,27 +4,26 @@
     {
         private readonly IService jailSetting;
 
-        public Jail(ISetting confSetting, ISetting localSetting, string name, IService jailSetting) : base(confSetting, localSetting, name)
+        public Jail(string name, ISetting localSetting, IService jailSetting) : base(name, localSetting)
         {
             this.jailSetting = jailSetting;
         }
 
-        public Jail(string name, IService jailSetting) : this(null, null, name, jailSetting)
-        { }
-
         public override string GetRule(string section, RuleType type)
         {
-            var value = LocalSetting?.GetSection(section)?.GetRule(type) ?? 
-                        ConfSetting?.GetSection(section)?.GetRule(type) ?? 
-                        jailSetting?.GetRule(section, type) ??
-                        jailSetting?.GetRule("DEFAULT", type);
+            var value = base.GetRule(section, type) ?? 
+                        jailSetting.GetRule(section, type) ??
+                        jailSetting.GetRule("DEFAULT", type);
 
             return value;
         }
 
         public override IService Clone()
         {
-            return new Jail(ConfSetting.Clone(), LocalSetting.Clone(), Name, jailSetting.Clone());
+            return new Jail(Name, LocalSetting.Clone(), jailSetting)
+            {
+                ConfSetting = ConfSetting?.Clone(),
+            };
         }
     }
 }

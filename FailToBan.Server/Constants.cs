@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using System.Text.RegularExpressions;
 using FailToBan.Core;
 
@@ -129,9 +130,10 @@ namespace FailToBan.Server
             { ShellSteps.LogPath, "Введите путь до каталога с файлом лога авторизации" },
             { ShellSteps.Filter, "Введите регулярное выражение для поиска строки с сообщением о неуспешной авторизации\nПримечание: формат обычный regexp, для указания хоста на его месте введите <HOST>" },
             { ShellSteps.TestFilter, "Хотите ли вы протестировать работу регулярного выражения(y/n)? Примечание: для тестирование в файле лога должна быть запись о неудачной авторизации" },
-            { ShellSteps.SetRule, "Введите save для сохранения\n" +
-                                 "Введите дополнительные значения для правила в формате 'rule value'\n" +
-                                 "Введите название правила и ? в формате 'rule ?' для получения значения по умолчанию для этого правила" },
+            { ShellSteps.SetRule, "Введите save для сохранения\n" + 
+                                  "Рекомендуемые правила: \n" + 
+                                  string.Join("\n", Rules.Where(x => x.Value.Category == RuleCategory.Recommended).Select(x => $"{x.Key}: {x.Value.Description}"))
+            },
             { ShellSteps.Exit, "Выход из интерактивного режима" }
         };
     }

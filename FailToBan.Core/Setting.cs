@@ -31,7 +31,16 @@ namespace FailToBan.Core
 
         public ISection GetOrCreateSection(string name)
         {
-            return sections.TryGetValue(name, out var section) ? section : new Section();
+            if (sections.TryGetValue(name, out var section))
+            {
+                return section;
+            }
+            else
+            {
+                var newSection = new Section();
+                sections.Add(name, newSection);
+                return newSection;
+            }
         }
 
         /// <summary>

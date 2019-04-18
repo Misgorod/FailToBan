@@ -9,10 +9,12 @@ namespace FailToBan.Core
     public class Section : ISection
     {
         public Dictionary<RuleType, string> Rules { get; }
+        public Dictionary<string, string> UnknownRules { get; }
 
         private Section(Dictionary<RuleType, string> rules)
         {
             this.Rules = rules;
+            UnknownRules = new Dictionary<string, string>();
         }
 
         public Section() : this(new Dictionary<RuleType, string>())
@@ -37,10 +39,25 @@ namespace FailToBan.Core
         /// <param name="rule"></param>
         /// <param name="value"></param>
         /// <returns></returns>
-        public ISection AddToRule(RuleType rule, string value)
+        public bool AddToRule(RuleType rule, string value)
         {
-            Rules[rule] += $"{Environment.NewLine} {value}";
-            return this;
+            if (Rules.ContainsKey(rule))
+            {
+                Rules[rule] += $"{Environment.NewLine} {value}";
+                return true;
+            }
+            return false;
+        }
+
+        public bool AddToUnknow(string rule, string value)
+        {
+            if (UnknownRules.ContainsKey(rule))
+            {
+                UnknownRules[rule] += value;
+                return true;
+            }
+
+            return false;
         }
 
         /// <inheritdoc />
@@ -61,6 +78,17 @@ namespace FailToBan.Core
             return clone;
         }
 
+        public ISection SetUnknown(string rule, string value)
+        {
+            UnknownRules[rule] = value;
+            return this;
+        }
+
+        public string GetUnknown(string rule)
+        {
+            return UnknownRules.ContainsKey(rule) ? UnknownRules[rule] : null;
+        }
+
         /// <inheritdoc />
         /// <summary>
         /// Возвращает текстовое представление секции для записи в конфигурационный файл
@@ -74,6 +102,11 @@ namespace FailToBan.Core
             foreach (var (rule, value) in Rules)
             {
                 builder.AppendLine($"{RuleTypeExtension.ToString(rule)} = {value}");
+            }
+
+            foreach (var (rule, value) in UnknownRules)
+            {
+                builder.AppendLine($"{rule} = {value}");
             }
 
             return builder.ToString();

@@ -1,4 +1,5 @@
-﻿using FailToBan.Core;
+﻿using System;
+using FailToBan.Core;
 
 namespace FailToBan.Server.Shells
 {
@@ -30,9 +31,11 @@ namespace FailToBan.Server.Shells
                        "Для изменения существующего сервиса используйте команду edit";
             }
 
-            currentJail = serviceFactory.BuildJail(serviceName, serviceContainer.GetDefault());
+            var localSetting = settingFactory.Build();
+            currentJail = serviceFactory.BuildJail(serviceName, localSetting, serviceContainer.GetDefault());
 
-            if (currentJail.GetRule(currentJail.Name, RuleType.Port) == null)
+            //if (currentJail.GetRule(currentJail.Name, RuleType.Port) == null)
+            if (currentJail.LocalSetting?.GetSection(currentJail.Name)?.GetRule(RuleType.Port) == null)
             {
                 shell.SetState(new SetPortState(this));
             }

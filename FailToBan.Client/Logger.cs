@@ -8,6 +8,77 @@ namespace FailToBan.Client
 {
     public class Logger
     {
+        private readonly string logPath;
+
+        public Logger(string logPath = "/_Data/Logs/CLI/Main.log")
+        {
+            this.logPath = logPath;
+
+            if (File.Exists(logPath))
+                return;
+
+            var directory = Path.GetDirectoryName(logPath);
+            Directory.CreateDirectory(directory);
+            File.Create(this.logPath).Close();
+        }
+
+        private string PrepareText(string text, From @from, LogType type)
+        {
+            var result = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            result += " " + GetText(@from);
+            result += " " + GetText(type);
+            result += " " + text;
+            return result;
+        }
+
+        public void Log(string text, From @from, LogType type)
+        {
+            using (var writer = new StreamWriter(File.Open(logPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)))
+            {
+                writer.WriteLine(PrepareText(text, @from, type));
+            }
+        }
+
+        public async Task LogAsync(string text, From @from, LogType type)
+        {
+            using (var writer = new StreamWriter(File.Open(logPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)))
+            {
+                await writer.WriteLineAsync(PrepareText(text, @from, type));
+            }
+        }
+
+        private string GetText(From @from)
+        {
+            switch (@from)
+            {
+                case From.Server:
+                    return "Сервер";
+                case From.Client:
+                    return "Клиент";
+                case From.Unknown:
+                    return "Неизвестно";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(@from), @from, null);
+            }
+        }
+
+        private string GetText(LogType type)
+        {
+            switch (type)
+            {
+                case LogType.Debug:
+                    return "Отладка";
+                case LogType.Error:
+                    return "Ошибка";
+                case LogType.Message:
+                    return "Сообщение";
+                case LogType.Warning:
+                    return "Предупреждение";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(type), type, null);
+            }
+        }
+
         public enum From
         {
             Unknown,
@@ -21,84 +92,6 @@ namespace FailToBan.Client
             Warning,
             Error,
             Debug
-        }
-
-        private string pathToLog;
-        private StreamWriter writer;
-
-        public Logger(string LogPath = "/_Data/Logs/CLI/Main.log")
-        {
-            pathToLog = LogPath;
-            if (!File.Exists(pathToLog))
-            {
-                List<string> PathList = pathToLog.Split('/').ToList();
-                for (int i = 2; i < PathList.Count; i++)
-                {
-                    string TempPath = string.Join('/', PathList.GetRange(0, i).ToArray());
-                    if (!Directory.Exists(TempPath))
-                    {
-                        Directory.CreateDirectory(TempPath);
-                    }
-                }
-                FileStream Stream = File.Create(pathToLog);
-                Stream.Close();
-            }
-        }
-
-        private string PrepareText(string Text, From From, LogType Type)
-        {
-            string Result = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            Result += " " + FromToText(From);
-            Result += " " + TypeToText(Type);
-            Result += " " + Text;
-            return Result;
-        }
-
-        public async void Log(string Text, From From, LogType Type)
-        {
-            await LogAsync(Text, From, Type);
-        }
-
-        public async Task LogAsync(string Text, From From, LogType Type)
-        {
-            using (writer = new StreamWriter(File.Open(pathToLog, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)))
-            {
-                await writer.WriteLineAsync(PrepareText(Text, From, Type));
-                try
-                {
-                    writer.Flush();
-                }
-                catch (ObjectDisposedException)
-                { }
-            }
-        }
-
-        private string FromToText(From From)
-        {
-            switch (From)
-            {
-                case From.Server:
-                    return "Server";
-                case From.Client:
-                    return "Client";
-            }
-            return "Unknown";
-        }
-
-        private string TypeToText(LogType Type)
-        {
-            switch (Type)
-            {
-                case LogType.Debug:
-                    return "Отладка";
-                case LogType.Error:
-                    return "Ошибка";
-                case LogType.Message:
-                    return "Сообщение";
-                case LogType.Warning:
-                    return "Предупреждение";
-            }
-            return "Unknown";
         }
     }
 }

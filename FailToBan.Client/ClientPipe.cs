@@ -39,7 +39,6 @@ namespace FailToBan.Client
             {
                 Dispose();
             }
-            Console.WriteLine($"CLIENT PIPE GOT {builder.ToString().TrimEnd('\n')}");
             return builder.ToString().TrimEnd('\n');
         }
 
@@ -51,9 +50,6 @@ namespace FailToBan.Client
                 await clientWriter.WriteLineAsync("end");
                 await clientWriter.FlushAsync();
             }
-
-            Console.WriteLine($"CLIENT PIPE SENT {message}");
-            Console.WriteLine($"CLIENT STOP SENT");
         }
 
         public void Dispose()

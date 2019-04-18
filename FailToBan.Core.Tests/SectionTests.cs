@@ -7,7 +7,7 @@ namespace FailToBan.Core.Tests
     public class SectionTests
     {
         [Test]
-        public void Get_GetNotExistingRule_NullGot()
+        public void GetRule_GetNotExistingRule_NullGot()
         {
             // Arrange
             var section = new Section();
@@ -18,7 +18,7 @@ namespace FailToBan.Core.Tests
         }
 
         [Test]
-        public void Add_AddToExistingRule_RuleAdded()
+        public void AddToRule_AddToExistingRule_RuleAdded()
         {
             // Arrange
             var section = new Section();
@@ -31,7 +31,18 @@ namespace FailToBan.Core.Tests
         }
 
         [Test]
-        public void Set_SetExistingRule_RuleSet()
+        public void AddToRule_AddToNotExistingRule_RuleNotAdded()
+        {
+            // Arrange
+            var sut = new Section();
+            // Act
+            var result = sut.AddToRule(RuleType.Null, "value");
+            // Assert
+            Assert.That(result, Is.False);
+        }
+
+        [Test]
+        public void SetRule_SetExistingRule_RuleSet()
         {
             // Arrange
             var section = new Section();
@@ -44,15 +55,43 @@ namespace FailToBan.Core.Tests
         }
 
         [Test]
+        public void AddToUnknown_AddExisting()
+        {
+            // Arrange
+            var sut = new Section();
+            sut.SetUnknown("rule", "");
+            // Act
+            var added = sut.AddToUnknow("rule", "value");
+            // Assert
+            var result = sut.GetUnknown("rule");
+            Assert.That(added, Is.True);
+            Assert.That(result ,Is.EqualTo("value"));
+        }
+
+        [Test]
+        public void AddToUnknown_AddNotExisting()
+        {
+            // Arrange
+            var sut = new Section();
+            // Act
+            var result = sut.AddToUnknow("rule", "value");
+            // Assert
+            var value = sut.GetUnknown("rule");
+            Assert.That(value, Is.Null);
+            Assert.That(result, Is.False);
+        }
+
+        [Test]
         public void ToString_ConvertToString_Converted()
         {
             // Arrange
             var section = new Section();
             const string expected = "[TestSection]\r\n" +
-                                    "enabled = true\r" +
-                                    "\n";
+                                    "enabled = true\r\n" +
+                                    "rule = value\r\n";
             // Act
             section.SetRule(RuleType.Enabled, "true");
+            section.SetUnknown("rule", "value");
             var result = section.ToString("TestSection");
             // Assert
             Assert.That(result, Is.EqualTo(expected));

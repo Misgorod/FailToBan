@@ -25,7 +25,11 @@ namespace FailToBan.Server.Shells
                     }
 
                     jailSaver.Save(currentJail);
-                    filterSaver.Save(currentFilter);
+                    if (currentFilter != null)
+                    {
+                        filterSaver.Save(currentFilter);
+                    }
+                    shell.SetState(new ExitState(this));
                     "fail2ban-client restart".Bash();
 
                     return "Jail успешно сохранён";
@@ -41,24 +45,32 @@ namespace FailToBan.Server.Shells
             {
                 currentJail.SetRule(currentJail.Name, rule, values[1]);
 
-                return "Значение правила установлено";
+                return "Значение правила установлено\n" +
+                       PrintCurrentRules();
             }
             else
             {
-                return "Неверное название правила";
+                return "Неверное название правила\n" +
+                       PrintCurrentRules();
             }
         }
 
         private bool TestSettings(out string result)
         {
-            result = "";
             if (currentJail == null)
             {
+                result = "Сервис не создан";
                 return false;
             }
 
             try
             {
+                Console.WriteLine("Начало тестирования сервиса");
+                Console.WriteLine(currentJail);
+                Console.WriteLine(currentFilter);
+                Console.WriteLine(jailSaver);
+                Console.WriteLine(filterSaver);
+
                 currentJail.SetRule(currentJail.Name, RuleType.Enabled, "true");
                 jailSaver.Save(currentJail);
 
@@ -76,6 +88,7 @@ namespace FailToBan.Server.Shells
                 Console.WriteLine("Got exception while testing jail");
                 Console.WriteLine(exception.Message);
                 Console.WriteLine(exception.StackTrace);
+                result = exception.Message;
                 return false;
             }
             finally

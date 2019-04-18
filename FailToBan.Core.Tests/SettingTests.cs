@@ -85,5 +85,30 @@ namespace FailToBan.Core.Tests
             // Assert
             Assert.That(mockSection.Object, Is.Not.SameAs(sections[sectionName]));
         }
+
+        [TestCase("section")]
+        public void GetOrCreateSections_ExistingSection_SectionGot(string sectionName)
+        {
+            // Arrange
+            var sut = new Setting();
+            var mockSection = new Mock<ISection>();
+            sut.AddSection(sectionName, mockSection.Object);
+            // Act
+            var result = sut.GetOrCreateSection(sectionName);
+            // Assert
+            Assert.That(result, Is.SameAs(mockSection.Object));
+        }
+
+        [TestCase("section")]
+        public void GetOrCreateSections_NotExistingSection_SectionGot(string sectionName)
+        {
+            // Arrange
+            var sut = new Setting();
+            var mockSection = new Mock<ISection>();
+            // Act
+            var result = sut.GetOrCreateSection(sectionName);
+            // Assert
+            Assert.That(result, Is.Not.Null);
+        }
     }
 }

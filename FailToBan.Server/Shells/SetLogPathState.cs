@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using FailToBan.Core;
@@ -29,8 +30,8 @@ namespace FailToBan.Server.Shells
             if (File.Exists(logPath))
             {
                 currentJail.SetRule(currentJail.Name, RuleType.Logpath, logPath);
-
-                if (currentJail.GetRule(currentJail.Name, RuleType.Filter) == null)
+                currentFilter = serviceContainer.GetFilter(currentJail.Name);
+                if (currentFilter == null)
                 {
                     shell.SetState(new SetFilterState(this));
                 }

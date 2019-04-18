@@ -40,7 +40,7 @@ namespace FailToBan.Server
             {
                 builder.AppendLine(message);
             }
-            Console.WriteLine($"SERVER PIPE GOT {builder.ToString().TrimEnd('\n')}");
+            //Console.WriteLine($"SERVER PIPE GOT {builder.ToString().TrimEnd('\n')}");
             return builder.ToString().TrimEnd('\n');
         }
 
@@ -53,8 +53,8 @@ namespace FailToBan.Server
                 await result.streamWriter.WriteLineAsync("end");
                 await result.streamWriter.FlushAsync();
             }
-            Console.WriteLine($"SERVER PIPE SENT {message}");
-            Console.WriteLine($"SERVER STOP SENT");
+            //Console.WriteLine($"SERVER PIPE SENT {message}");
+            //Console.WriteLine($"SERVER STOP SENT");
         }
 
         public async Task WriteLastAsync(string message, int clientId)
@@ -66,8 +66,8 @@ namespace FailToBan.Server
                 await result.streamWriter.WriteLineAsync("exit");
                 await result.streamWriter.FlushAsync();
             }
-            Console.WriteLine($"SERVER PIPE SENT {message}");
-            Console.WriteLine($"SERVER STOP SENT");
+            //Console.WriteLine($"SERVER PIPE SENT {message}");
+            //Console.WriteLine($"SERVER STOP SENT");
             Disconnect(clientId);
         }
 

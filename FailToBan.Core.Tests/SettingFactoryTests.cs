@@ -20,6 +20,8 @@ namespace FailToBan.Core.Tests
             @"^\s+(.+)\s*",
             "[TestSection]\r\n" +
             "enabled = value\r\n" +
+            " value\r\n" +
+            "rule = value\r\n" +
             " value\r\n",
             new string[] { "TestSection" },
             new RuleType[] { RuleType.Enabled },

@@ -16,13 +16,13 @@ namespace FailToBan.Core
         public Dictionary<string, IService> Actions => actions.Select(service => new KeyValuePair<string, IService>(service.Key, service.Value.Clone())).ToDictionary(pair => pair.Key, pair => pair.Value);
         public Dictionary<string, IService> Filters => filters.Select(service => new KeyValuePair<string, IService>(service.Key, service.Value.Clone())).ToDictionary(pair => pair.Key, pair => pair.Value);
 
-        public ServiceContainer(IService jail, Dictionary<string, IService> jails, Dictionary<string, IService> actions, Dictionary<string, IService> filters)
-        {
-            this.jail = jail;
-            this.jails = jails;
-            this.actions = actions;
-            this.filters = filters;
-        }
+        //public ServiceContainer(IService jail, Dictionary<string, IService> jails, Dictionary<string, IService> actions, Dictionary<string, IService> filters)
+        //{
+        //    this.jail = jail;
+        //    this.jails = jails;
+        //    this.actions = actions;
+        //    this.filters = filters;
+        //}
 
         public ServiceContainer()
         {

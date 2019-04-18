@@ -1,0 +1,3 @@
+#!/bin/bash
+
+dotnet /_Data/CLI/Client/FailToBan.Client.dll "$@"

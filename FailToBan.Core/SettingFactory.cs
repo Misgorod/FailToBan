@@ -23,29 +23,45 @@ namespace FailToBan.Core
             // TODO: Create section factory
             Section section = null;
             var rule = RuleType.Null;
+            string ruleString = null;
             string ruleValue = null;
             foreach (var s in configuration.Split("\n"))
             {
                 var sectionName = sectionRegex.IsMatch(s) ? sectionRegex.Match(s).Groups[1].Value : null;
                 if (sectionName != null)
                 {
+                    //Console.WriteLine($"[{sectionName}]");
                     section = new Section();
                     setting.AddSection(sectionName, section);
                     continue;
                 }
 
                 var ruleName = ruleRegex.IsMatch(s) ? ruleRegex.Match(s).Groups[1].Value : null;
-                if (ruleName != null && section != null && RuleTypeExtension.TryParse(ruleName, out rule))
+                if (ruleName != null && section != null)
                 {
-                    ruleValue = ruleRegex.Match(s).Groups[2].Value;
-                    section.SetRule(rule, ruleValue);
-                    continue;
+                    //Console.WriteLine($"\t{ruleName}");
+                    ruleString = ruleName;
+                    if (!RuleTypeExtension.TryParse(ruleName, out rule))
+                    {
+                        ruleValue = ruleRegex.Match(s).Groups[2].Value;
+                        section.SetUnknown(ruleName, ruleValue);
+                        continue;
+                    }
+                    else
+                    {
+                        ruleValue = ruleRegex.Match(s).Groups[2].Value;
+                        section.SetRule(rule, ruleValue);
+                        continue;
+                    }
                 }
 
                 var continuation = continuationRegex.IsMatch(s) ? continuationRegex.Match(s).Groups[1].Value : null;
                 if (continuation != null && ruleValue != null)
                 {
-                    section.AddToRule(rule, continuation);
+                    if (!section.AddToRule(rule, continuation))
+                    {
+                        section.AddToUnknow(ruleString, continuation);
+                    }
                 }
             }
 

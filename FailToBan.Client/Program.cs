@@ -8,62 +8,62 @@ namespace FailToBan.Client
 {
     internal class Program
     {
-        private bool run = false;
-        private Logger logger;
+        private static bool run;
+        private static Logger logger;
 
-        private async void LogData(string text, Logger.From @from, Logger.LogType type)
+        private static async Task LogAsync(string text, Logger.From @from, Logger.LogType type)
         {
             await logger.LogAsync(text, @from, type);
             Console.WriteLine(text);
         }
 
-        private async Task Main(string[] args)
+        public static async Task Main(string[] args)
         {
             logger = new Logger();
             try
             {
                 using (var clientPipe = new ClientPipe("VICFTB"))
                 {
-                    LogData("Инициализация Pipe коннектора", Logger.From.Client, Logger.LogType.Debug);
-                    LogData($"Аргументы запуска \"{string.Join(" ", args)}\"", Logger.From.Client, Logger.LogType.Debug);
+                    await LogAsync("Инициализация Pipe коннектора", Logger.From.Client, Logger.LogType.Debug);
                     await clientPipe.ConnectAsync();
 
                     switch (string.Join(" ", args))
                     {
                         case "create":
+                        case "edit":
                             run = true;
                             break;
 
-                        case "edit":
-                            run = true;
+                        default:
+                            run = false;
                             break;
                     }
 
                     await clientPipe.WriteAsync(string.Join(" ", args));
-                    LogData($"Ввод пользователя: {string.Join(" ", args)}", Logger.From.Client, Logger.LogType.Debug);
                     var response = await clientPipe.ReadAsync();
-                    LogData($"Ответ сервера: {response}", Logger.From.Client, Logger.LogType.Message);
-
+                    await LogAsync($"Ответ сервера:\n{response}", Logger.From.Client, Logger.LogType.Debug);
+                    //Console.WriteLine(response);
                     while (run)
                     {
                         var request = await Console.In.ReadLineAsync();
-                        LogData($"Ввод пользователя: {request}", Logger.From.Client, Logger.LogType.Debug);
+                        await LogAsync($"Ввод пользователя: {request}", Logger.From.Client, Logger.LogType.Debug);
+                        await clientPipe.WriteAsync(request);
 
                         if (request == "q")
                         {
                             break;
                         }
 
-                        await clientPipe.WriteAsync(request);
                         response = await clientPipe.ReadAsync();
-                        LogData($"Ответ сервера: {response}", Logger.From.Client, Logger.LogType.Message);
+                        await LogAsync($"Ответ сервера:\n{response}", Logger.From.Client, Logger.LogType.Debug);
+                        //Console.WriteLine(response);
                     }
                 }
             }
             catch (Exception e)
             {
-                LogData(e.Message, Logger.From.Client, Logger.LogType.Error);
-                LogData(e.StackTrace, Logger.From.Client, Logger.LogType.Error);
+                await LogAsync(e.Message, Logger.From.Client, Logger.LogType.Error);
+                await LogAsync(e.StackTrace, Logger.From.Client, Logger.LogType.Error);
             }
         }
     }

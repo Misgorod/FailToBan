@@ -23,11 +23,17 @@ namespace FailToBan.Server.Shells
 
             var serviceName = values[0];
             currentJail = serviceContainer.GetJail(serviceName);
+            currentFilter = serviceContainer.GetFilter(serviceName);
 
             if (currentJail == null)
             {
                 return "Сервиса с таким именем не существует\n" +
                        "Для создания сервиса используйте команду create";
+            }
+
+            if (currentFilter == null)
+            {
+                return $"Фильтра для сервиса {serviceName} не существует";
             }
 
             if (currentJail.GetRule(currentJail.Name, RuleType.Port) == null)

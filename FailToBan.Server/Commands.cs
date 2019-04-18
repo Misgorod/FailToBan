@@ -30,41 +30,30 @@ namespace FailToBan.Server
             var result = new Dictionary<string, string>();
 
             var confSections = serviceContainer.GetJail(jailName).ConfSetting.Sections;
-            foreach (var (name, section) in confSections)
+            if (confSections != null)
             {
-                foreach (var (rule, value) in section.Rules)
+                foreach (var (name, section) in confSections)
                 {
-                    result[rule.ToString()] = value;
+                    foreach (var (rule, value) in section.Rules)
+                    {
+                        result[rule.ToString()] = value;
+                    }
                 }
             }
 
             var localSections = serviceContainer.GetJail(jailName).LocalSetting.Sections;
-            foreach (var (name, section) in localSections)
+            if (localSections != null)
             {
-                foreach (var (rule, value) in section.Rules)
+                foreach (var (name, section) in localSections)
                 {
-                    result[rule.ToString()] = value;
+                    foreach (var (rule, value) in section.Rules)
+                    {
+                        result[rule.ToString()] = value;
+                    }
                 }
             }
-
+            
             return result;
-        }
-
-        public static void ToggleJail(IServiceContainer serviceContainer, string jailName, bool value, IServiceSaver serviceSaver)
-        {
-            var toggle = value ? "true" : "false";
-            var service = serviceContainer.GetJail(jailName);
-            service.SetRule(jailName, RuleType.Enabled, toggle);
-
-            serviceSaver?.Save(service);
-        }
-
-        public static void ToggleJails(IServiceContainer serviceContainer, IEnumerable<string> jails, bool value, IServiceSaver serviceSaver)
-        {
-            foreach (var jail in jails)
-            {
-                ToggleJail(serviceContainer, jail, value, serviceSaver);
-            }
         }
 
         public static void ChangeJailRule(IServiceContainer serviceContainer, string jailName, string ruleName, string ruleValue, IServiceSaver serviceSaver)
@@ -76,41 +65,19 @@ namespace FailToBan.Server
 
             var service = serviceContainer.GetJail(jailName);
             service.SetRule(jailName, rule, ruleValue);
-            serviceSaver?.Save(service);
+            serviceSaver.Save(service);
         }
 
-        public static void ChangeActionRule(IServiceContainer serviceContainer, string jailName, string sectionName, string ruleName, string ruleValue, IServiceSaver serviceSaver)
+        public static void PrepareMail(IServiceContainer serviceContainer, IServiceFactory serviceFactory, ISettingFactory settingFactory, string senderName, string smtpUser, string mailTo, IServiceSaver defaultSaver, IServiceSaver actionSaver)
         {
-            if (!RuleTypeExtension.TryParse(ruleName, out var rule))
-            {
-                throw new VicException("Wrong rule name");
-            }
-
-            var service = serviceContainer.GetAction(jailName);
-            service.SetRule(sectionName, rule, ruleValue);
-            serviceSaver?.Save(service);
-        }
-
-        public static void ChangeFilterRule(IServiceContainer serviceContainer, string jailName, string sectionName, string ruleName, string ruleValue, IServiceSaver serviceSaver)
-        {
-            if (!RuleTypeExtension.TryParse(ruleName, out var rule))
-            {
-                throw new VicException("Wrong rule name");
-            }
-
-            var service = serviceContainer.GetFilter(jailName);
-            service.SetRule(sectionName, rule, ruleValue);
-            serviceSaver?.Save(service);
-        }
-
-        public static void PrepareMail(IServiceContainer serviceContainer, IServiceFactory serviceFactory, string senderName, string smtpUser, string mailTo, IServiceSaver defaultSaver, IServiceSaver actionSaver)
-        {
-            var actionBan = "dotnet /_Data/CLI/VICFailToBan.dll _logban <ip> <name>";
-            var actionUnban = "dotnet /_Data/CLI/VICFailToBan.dll _logunban <ip> <name>";
+            var actionBan = "dotnet /_Data/CLI/Client/FailToBan.Client.dll _logban <ip> <name>";
+            var actionUnban = "dotnet /_Data/CLI/Client/FailToBan.Client.dll _logunban <ip> <name>";
 
 
             var sendMailService = serviceContainer.GetAction("sendmail-vic") ?? 
                                   serviceFactory.BuildService("sendmail-vic");
+
+            if (sendMailService.LocalSetting == null) sendMailService.LocalSetting = settingFactory.Build();
 
             var sendMailInclude = sendMailService.LocalSetting.GetOrCreateSection("INCLUDES");
             var sendMailDefinition = sendMailService.LocalSetting.GetOrCreateSection("Definition");
@@ -122,7 +89,6 @@ namespace FailToBan.Server
             sendMailDefinition.SetRule(RuleType.Actionunban, actionUnban);
             sendMailInit.SetRule(RuleType.Name, "default");
             sendMailInit.SetRule(RuleType.Sender, smtpUser);
-
             var defaultService = serviceContainer.GetDefault();
 
             var action = defaultService.GetRule("DEFAULT", RuleType.Action_) ?? "";
@@ -133,16 +99,21 @@ namespace FailToBan.Server
             defaultService.SetRule("DEFAULT", RuleType.ActionVic, actionBanVic);
             defaultService.SetRule("DEFAULT", RuleType.Action, "%(action_vic)s");
 
-            actionSaver?.Save(sendMailService);
-            defaultSaver?.Save(defaultService);
+            actionSaver.Save(sendMailService);
+            defaultSaver.Save(defaultService);
         }
 
-        public static void PrepareBanAction(IServiceContainer serviceContainer, IServiceSaver serviceSaver)
+        public static void PrepareBanAction(IServiceContainer serviceContainer, IServiceFactory serviceFactory, ISettingFactory settingFactory, IServiceSaver serviceSaver)
         {
             // Action: iptables-multiport
             // Action: iptables-allports
-            var multiport = serviceContainer.GetAction("iptables-multiport") ?? throw new VicException("There is no iptables-multiport");
-            var allports = serviceContainer.GetAction("iptables-allports") ?? throw new VicException("There is no iptables-allports");
+            var multiportConf = settingFactory.Build(File.ReadAllText("/etc/fail2ban/action.d/iptables-multiport.conf.base"));
+            var multiport = serviceFactory.BuildService("iptables-multiport");
+            multiport.ConfSetting = multiportConf;
+
+            var allportsConf = settingFactory.Build(File.ReadAllText("/etc/fail2ban/action.d/iptables-allports.conf.base"));
+            var allports = serviceFactory.BuildService("iptables-allports");
+            allports.ConfSetting = allportsConf;
 
             var chainRegex = new Regex("[=]?(.)(<chain>)(.)");
             var rulesToReplace = new List<RuleType>
@@ -152,12 +123,14 @@ namespace FailToBan.Server
                 RuleType.Actionban,
                 RuleType.Actionunban
             };
-
             ReplaceAction(multiport, rulesToReplace, chainRegex);
             ReplaceAction(allports, rulesToReplace, chainRegex);
 
-            serviceSaver?.Save(multiport);
-            serviceSaver?.Save(allports);
+            serviceContainer.SetAction(multiport);
+            serviceContainer.SetAction(allports);
+
+            serviceSaver.Save(multiport);
+            serviceSaver.Save(allports);
         }
 
         private static void ReplaceAction(IService service, List<RuleType> rulesToReplace, Regex chainRegex)
@@ -177,10 +150,10 @@ namespace FailToBan.Server
                 {
                     if (chainRegex.IsMatch(action))
                     {
-                        actionNew +=
+                        actionNew += " " +
                             chainRegex.Replace(action, m => m.Groups[1].Value + "INPUT" + m.Groups[3].Value) +
                             Environment.NewLine;
-                        actionNew +=
+                        actionNew += " " +
                             chainRegex.Replace(action, m => m.Groups[1].Value + "FORWARD" + m.Groups[3].Value) +
                             Environment.NewLine;
                     }
@@ -194,49 +167,62 @@ namespace FailToBan.Server
             }
         }
 
-        public static bool LogBan(IPAddress ip, string service, string mailLogFile, string statusLogFile)
+        public static bool LogBan(IPAddress ip, string service, string mailLogFile, string statusLogFile, string whiteListFile)
         {
-            Console.WriteLine("START WRITE TO MAIL LOG");
             using (var writer = new StreamWriter(File.Open(mailLogFile, FileMode.Append, FileAccess.Write)))
             {
                 writer.WriteLine($"ban;{DateTime.Now.ToString(Constants.TimeFormat)};{ip};{service}");
             }
 
-            Console.WriteLine("START WRITE TO STATUS LOG");
             using (var writer = new StreamWriter(File.Open(statusLogFile, FileMode.Append, FileAccess.Write)))
             {
                 writer.WriteLine($"ban;{DateTime.Now.ToString(Constants.TimeFormat)};{ip};{service}");
             }
 
+            var whiteList = WhiteListStatus(whiteListFile);
+            if (whiteList.Contains(ip))
+            {
+                var result = $"fail2ban-client set {service} unbanip '{ip}'".Bash();
+                return CheckBanResult(result);
+            }
+
             return true;
+        }
+
+        private static IEnumerable<IPAddress> WhiteListStatus(string whiteListFile)
+        {
+            var result = new List<IPAddress>();
+            var whiteText = File.ReadAllText(whiteListFile);
+            var ipListStrings = whiteText.Split(new char[] {'\n', ' ', ','}, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var ipListString in ipListStrings)
+            {
+                if (IPAddress.TryParse(ipListString, out var address))
+                {
+                    result.Add(address);
+                }
+            }
+
+            return result;
         }
 
         public static bool LogUnban(IPAddress ip, string service, string mailLogFile, string statusLogFile, string blackListFile)
         {
-            Console.WriteLine("START LOG UNBAN");
-            Console.WriteLine("START WRITE TO MAIL LOG");
             using (var writer = new StreamWriter(File.Open(mailLogFile, FileMode.Append, FileAccess.Write)))
             {
                 writer.WriteLine($"unban;{DateTime.Now.ToString(Constants.TimeFormat)};{ip};{service}");
             }
 
-            Console.WriteLine("START WRITE TO STATUS LOG");
             using (var writer = new StreamWriter(File.Open(statusLogFile, FileMode.Append, FileAccess.Write)))
             {
                 writer.WriteLine($"unban;{DateTime.Now.ToString(Constants.TimeFormat)};{ip};{service}");
             }
 
             var blackList = BlackListStatus(blackListFile);
-            Console.WriteLine("GOT BLACK LIST");
             if (blackList.Contains((ip, service)))
             {
-                Console.WriteLine("START BAN BY FAIL2BAN");
                 string result = $"fail2ban-client set {service} banip '{ip}'".Bash();
-                Console.WriteLine("FINISH BAN BY FAIL2BAN");
-                Console.WriteLine("FINISH LOG UNBAN");
                 return CheckBanResult(result);
             }
-            Console.WriteLine("FINISH LOG UNBAN");
             return true;
         }
 
@@ -328,19 +314,22 @@ namespace FailToBan.Server
             return bans;
         }
 
-        public static bool Ban(IPAddress ip, string service, string blackListFile)
+        public static bool Ban(IPAddress ip, string service, string blackListFile, string whiteListFile)
         {
-            Console.WriteLine("START BAN");
+            var whiteIps = WhiteListStatus(whiteListFile);
+            if (whiteIps.Contains(ip))
+            {
+                return false;
+            }
             if (!BlackListStatus(blackListFile).Contains((ip, service)))
             {
-                AddToBlackList(ip, service);
+                AddToBlackList(ip, service, blackListFile);
             }
             string result = $"fail2ban-client set {service} banip '{ip}'".Bash();
-            Console.WriteLine("FINISH BAN");
             return (CheckBanResult(result));
         }
 
-        private static void AddToBlackList(IPAddress ip, string service, string blackListFile = Constants.BlackListPath)
+        private static void AddToBlackList(IPAddress ip, string service, string blackListFile)
         {
             using (var writer = new StreamWriter(File.Open(blackListFile, FileMode.Append, FileAccess.Write)))
             {
@@ -351,9 +340,7 @@ namespace FailToBan.Server
         public static bool Unban(IPAddress ip, string service, string blackListFile)
         {
             DeleteFromBlackList(ip, blackListFile);
-            Console.WriteLine("START UNBAN");
             var result = $"fail2ban-client set {service} unbanip '{ip}'".Bash();
-            Console.WriteLine("FINISH UNBAN");
             return (CheckBanResult(result));
         }
 

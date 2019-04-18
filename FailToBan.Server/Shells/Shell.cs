@@ -12,7 +12,7 @@ namespace FailToBan.Server.Shells
 
         public virtual string Get(string[] values)
         {
-            return state.Handle(values) + state.Message;
+            return state.Handle(values) + "\n" + state.Message;
         }
 
         public void SetState(ShellState state)
